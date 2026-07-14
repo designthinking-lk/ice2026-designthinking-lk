@@ -52,10 +52,12 @@ button { font-family: inherit; }
   position: relative;
 }
 .nav a i { font-size: 14px; width: 18px; text-align: center; color: var(--text-faint); }
+.nav a[hidden] { display: none; }
 .nav a:hover { background: var(--bg-subtle); color: var(--text); }
 .nav a.active { background: var(--color-neutral-100); color: #fff; }
 .nav a.active i { color: rgba(255, 255, 255, 0.7); }
 .nav .badge { margin-left: auto; }
+.nav a .ext { margin-left: auto; font-size: 10px; opacity: 0.55; }
 .badge {
   min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
   background: var(--color-accent); color: #fff;

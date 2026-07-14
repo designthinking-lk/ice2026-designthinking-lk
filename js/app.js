@@ -12,7 +12,6 @@
     q: '',            // directory search
     roleFilter: 'all',
     skillFilter: null,
-    pollTimer: null,
   };
 
   // ------------------------------------------------------------- utilities
@@ -120,9 +119,6 @@
     var navMsg = $('#navMessages');
     if (signedIn() && d.me) {
       navMsg.hidden = false;
-      var b = $('#unreadBadge');
-      if (d.unread > 0) { b.hidden = false; b.textContent = d.unread > 99 ? '99+' : d.unread; }
-      else b.hidden = true;
       actions.innerHTML =
         '<button class="avatar-btn" data-action="user-menu">' + avatar(d.me, 'avatar-sm') +
         '<span>' + esc(d.me.name.split(' ')[0]) + '</span><i class="fa-solid fa-chevron-down" style="font-size:10px;color:var(--text-faint)"></i></button>';
@@ -285,7 +281,7 @@
       '</div>' +
       '<div>' +
       (isMe ? '<a class="btn btn-outline btn-sm" href="#/me"><i class="fa-solid fa-pen"></i>Edit profile</a>'
-            : (signedIn() && me() ? '<a class="btn btn-primary btn-sm" href="#/messages/' + esc(u.id) + '"><i class="fa-regular fa-message"></i>Message</a>'
+            : (signedIn() && me() ? '<button class="btn btn-primary btn-sm" data-action="chat-dm" data-email="' + esc(u.email || '') + '"><i class="fa-regular fa-message"></i><span class="label">Message</span><span class="spin"></span></button>'
                                   : '<button class="btn btn-primary btn-sm" data-action="sign-in"><i class="fa-brands fa-google"></i>Sign in to message</button>')) +
       (u.video ? ' <a class="btn btn-ghost btn-sm" href="' + esc(u.video) + '" target="_blank" rel="noopener"><i class="fa-solid fa-video"></i>Intro video</a>' : '') +
       '</div></div></div>' +
@@ -450,63 +446,6 @@
       '<button class="btn btn-ghost" type="button" data-action="close-modal">Cancel</button></div></form>');
   }
 
-  // -------------------------------------------------------------- messages
-
-  function viewMessages(peerId) {
-    if (!signedIn() || !me()) {
-      return '<div class="empty" style="margin-top:40px"><i class="fa-regular fa-message"></i>Sign in to see your messages.<br><br>' +
-        '<button class="btn btn-primary" data-action="sign-in"><i class="fa-brands fa-google"></i>Sign in</button></div>';
-    }
-    // async load inbox + thread
-    loadMessages(peerId);
-    var peer = peerId ? userById(peerId) : null;
-    return '<div class="section-head" style="margin-top:16px"><h2 style="font-size:30px">Messages</h2></div>' +
-      '<div class="msg-layout">' +
-      '<div class="conv-list" id="convList"><div class="skeleton" style="height:60px"></div></div>' +
-      '<div class="panel thread" id="threadPanel">' +
-      (peer
-        ? '<h3 style="margin-bottom:10px">' + avatar(peer, 'avatar-sm') + ' <a href="#/profile/' + esc(peer.id) + '">' + esc(peer.name) + '</a></h3>' +
-          '<div class="thread-scroll" id="threadScroll"><div class="skeleton" style="height:60px"></div></div>' +
-          '<div class="thread-input"><textarea class="input" id="msgInput" placeholder="Write a message…"></textarea>' +
-          '<button class="btn btn-primary" data-action="send-msg" data-peer="' + esc(peerId) + '"><span class="label"><i class="fa-regular fa-paper-plane"></i></span><span class="spin"></span></button></div>'
-        : '<div class="empty" style="border:none"><i class="fa-regular fa-comments"></i>Pick a conversation, or open someone\'s profile and press Message.</div>') +
-      '</div></div>';
-  }
-
-  async function loadMessages(peerId) {
-    try {
-      var inbox = await A.api('msg_inbox');
-      var list = $('#convList');
-      if (list) {
-        var convs = inbox.conversations || [];
-        list.innerHTML = convs.length ? convs.map(function (c) {
-          var p = userById(c.peerId) || { name: 'Unknown' };
-          return '<a class="conv' + (c.peerId === peerId ? ' active' : '') + '" href="#/messages/' + esc(c.peerId) + '">' +
-            avatar(p, 'avatar-sm') + '<div style="flex:1;min-width:0"><div class="who">' + esc(p.name) +
-            (c.unread ? ' <b class="badge">' + c.unread + '</b>' : '') + '</div>' +
-            '<div class="last">' + esc(c.last ? c.last.content : '') + '</div></div></a>';
-        }).join('') : '<div class="empty" style="padding:24px"><i class="fa-regular fa-envelope-open"></i>No conversations yet.</div>';
-      }
-      if (peerId) {
-        var r = await A.api('msg_thread', { peerId: peerId });
-        renderThread(r.messages || []);
-      }
-    } catch (err) {
-      toast(err.message || 'Could not load messages', true);
-    }
-  }
-
-  function renderThread(messages) {
-    var scroll = $('#threadScroll');
-    if (!scroll) return;
-    var myId = me().id;
-    scroll.innerHTML = messages.length ? messages.map(function (m) {
-      return '<div class="bubble ' + (m.senderId === myId ? 'me' : 'them') + '">' + esc(m.content) +
-        '<time>' + esc(timeAgo(m.createdAt)) + '</time></div>';
-    }).join('') : '<div style="color:var(--text-muted);text-align:center;padding:30px 0">Say hello — this is the beginning of your conversation.</div>';
-    scroll.scrollTop = scroll.scrollHeight;
-  }
-
   // ------------------------------------------------------ register / edit
 
   function profileForm(u, isNew) {
@@ -629,8 +568,6 @@
     { re: /^#\/teams$/, view: viewTeams },
     { re: /^#\/team\/([\w-]+)$/, view: viewTeam },
     { re: /^#\/announcements$/, view: viewAnnouncements },
-    { re: /^#\/messages$/, view: viewMessages },
-    { re: /^#\/messages\/([\w-]+)$/, view: viewMessages },
     { re: /^#\/register$/, view: viewRegister },
     { re: /^#\/me$/, view: viewMe },
     { re: /^#\/admin$/, view: viewAdmin },
@@ -638,7 +575,6 @@
 
   function route() {
     var hash = location.hash || '#/';
-    clearInterval(state.pollTimer);
     var view = $('#view');
     for (var i = 0; i < routes.length; i++) {
       var m = hash.match(routes[i].re);
@@ -655,12 +591,6 @@
   function wireViewExtras(hash, m) {
     // people hive: size hexes to the viewport once laid out
     if ($('#hiveWrap')) requestAnimationFrame(fitHive);
-    // message polling
-    if (/^#\/messages/.test(hash)) {
-      state.pollTimer = setInterval(function () {
-        if (/^#\/messages/.test(location.hash)) loadMessages(m && m[1]);
-      }, 20000);
-    }
     // skill tag input
     var skillInput = $('#skillInput');
     if (skillInput) {
@@ -814,16 +744,12 @@
           route();
         } catch (err) { toast(err.message, true); }
         break;
-      case 'send-msg': {
-        var box = $('#msgInput');
-        var msg = box && box.value.trim();
-        if (!msg) break;
+      case 'chat-dm': {
+        var chatEmail = t.getAttribute('data-email');
+        if (!chatEmail) { toast('This person has no workshop email yet.', true); break; }
         busy(t, true);
-        try {
-          await A.api('msg_send', { toId: t.getAttribute('data-peer'), content: msg });
-          box.value = '';
-          await loadMessages(t.getAttribute('data-peer'));
-        } catch (err) { toast(err.message, true); }
+        try { await window.IceChat.openDm(chatEmail); }
+        catch (err) { toast(err.message || 'Could not open Google Chat', true); }
         busy(t, false);
         break;
       }
