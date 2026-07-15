@@ -143,6 +143,21 @@
       navMsg.hidden = true;
       actions.innerHTML = '<button class="btn btn-primary btn-sm" data-action="sign-in"><i class="fa-brands fa-google"></i>Sign in</button>';
     }
+    // chat side pane — available to registered participants (chat needs a
+    // workshop account). Hide the toggle + force-close the pane otherwise.
+    var chatToggle = $('#chatToggle');
+    var showChat = signedIn() && !!d.me;
+    if (chatToggle) chatToggle.hidden = !showChat;
+    if (!showChat) {
+      var pane = $('#chatpane');
+      if (pane && !pane.hidden) { pane.hidden = true; document.body.classList.remove('chat-open'); }
+    } else {
+      renderChatPane();
+      if (localStorage.getItem('ice2026.chat') === 'open' && $('#chatpane') && $('#chatpane').hidden) {
+        $('#chatpane').hidden = false;
+        document.body.classList.add('chat-open');
+      }
+    }
     // active nav
     var hash = location.hash || '#/';
     $all('#nav a').forEach(function (a) {
@@ -169,6 +184,50 @@
       '<a class="conv" href="#/register" data-action="close-modal"><i class="fa-solid fa-user-plus"></i> Complete registration</a>' +
       '<a class="conv" href="#" data-action="sign-out"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sign out</a>';
     modal('<h2>Account</h2><div class="conv-list">' + items + '</div>');
+  }
+
+  // ------------------------------------------------------------- chat pane
+  // Toggleable right rail listing everyone who has a workshop @designthinking.lk
+  // account; clicking opens the 1:1 Google Chat DM (js/chat.js).
+
+  function workEmailOf(u) {
+    var w = u && u.workEmail;
+    return (w && /@designthinking\.lk$/i.test(w)) ? w : '';
+  }
+
+  function chatPaneList() {
+    var users = (state.data && state.data.users) || [];
+    var mine = me();
+    var list = users.filter(function (u) {
+      return workEmailOf(u) && (!mine || u.id !== mine.id);
+    }).sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
+    if (!list.length) {
+      return '<div class="chatpane-empty"><i class="fa-regular fa-comment-dots"></i>' +
+        '<span>No workshop accounts yet.<br>People appear here once they register.</span></div>';
+    }
+    return list.map(function (u) {
+      return '<button class="chat-row" data-action="chat-dm" data-email="' + esc(workEmailOf(u)) + '" title="Message ' + esc(u.name) + '">' +
+        avatar(u, 'avatar-sm') +
+        '<span class="chat-row-info"><span class="chat-row-name">' + esc(u.name) +
+        (u.role === 'mentor' ? ' <i class="fa-solid fa-star chat-row-star" title="Mentor"></i>' : '') + '</span>' +
+        (u.affiliation ? '<span class="chat-row-sub">' + esc(u.affiliation) + '</span>' : '') + '</span>' +
+        '<i class="fa-regular fa-paper-plane chat-row-go"></i></button>';
+    }).join('');
+  }
+
+  function renderChatPane() {
+    var body = $('#chatpaneBody');
+    if (body) body.innerHTML = chatPaneList();
+  }
+
+  function setChatPane(open) {
+    var pane = $('#chatpane');
+    if (!pane) return;
+    pane.hidden = !open;
+    document.body.classList.toggle('chat-open', open);
+    localStorage.setItem('ice2026.chat', open ? 'open' : 'closed');
+    if (open) { renderChatPane(); fitWordmark(); }
+    else requestAnimationFrame(fitWordmark);
   }
 
   // ---------------------------------------------------------------- views
@@ -383,7 +442,7 @@
       '</div>' +
       '<div>' +
       (isMe ? '<a class="btn btn-outline btn-sm" href="#/me"><i class="fa-solid fa-pen"></i>Edit profile</a>'
-            : (signedIn() && me() ? '<button class="btn btn-primary btn-sm" data-action="chat-dm" data-email="' + esc(u.email || '') + '"><i class="fa-regular fa-message"></i><span class="label">Message</span><span class="spin"></span></button>'
+            : (signedIn() && me() ? '<button class="btn btn-primary btn-sm" data-action="chat-dm" data-email="' + esc(u.workEmail || u.email || '') + '"><i class="fa-regular fa-message"></i><span class="label">Message</span><span class="spin"></span></button>'
                                   : '<button class="btn btn-primary btn-sm" data-action="sign-in"><i class="fa-brands fa-google"></i>Sign in to message</button>')) +
       (u.video ? ' <a class="btn btn-ghost btn-sm" href="' + esc(u.video) + '" target="_blank" rel="noopener"><i class="fa-solid fa-video"></i>Intro video</a>' : '') +
       '</div></div></div>' +
@@ -772,7 +831,7 @@
 
   function validateProfile(form) {
     var fd = new FormData(form);
-    if (!String(fd.get('name') || '').trim()) return 'Please enter your name.';
+    if (!String(fd.get('firstName') || '').trim()) return 'Please enter your first name.';
     var linkRules = [
       ['linkGithub', /(^|\.)github\.com$/i, 'GitHub'],
       ['linkWebsite', null, 'Website'],
@@ -806,6 +865,10 @@
     var genders = opts('gender', ['Female', 'Male', 'Non-binary', 'Prefer not to say']);
     var skills = (u.skills || []);
     var vid = ytId(u.video || '');
+    // The card edits first + last separately; they recombine into the stored `name`.
+    var nameParts = String(u.name || '').trim().split(/\s+/).filter(Boolean);
+    var firstName = nameParts.shift() || '';
+    var lastName = nameParts.join(' ');
 
     return '<form class="form pf-grid" id="profileForm" data-new="' + (isNew ? '1' : '') + '">' +
 
@@ -824,7 +887,10 @@
       '<button type="button" class="photo-change" data-action="photo-pick" title="Change photo"><i class="fa-solid fa-camera"></i></button>' +
       '</div><span class="photo-hint" id="photoHint"' + (u.image ? '' : ' hidden') + '>drag to adjust · scroll to zoom</span></div>' +
       '<div class="idcard-fields">' +
-      '<input class="cinput cname" name="name" required maxlength="100" placeholder="Full name" value="' + esc(u.name || '') + '">' +
+      '<div class="cname-row">' +
+      '<input class="cinput cname" name="firstName" required maxlength="50" placeholder="First name" value="' + esc(firstName) + '">' +
+      '<input class="cinput cname" name="lastName" maxlength="50" placeholder="Last name" value="' + esc(lastName) + '">' +
+      '</div>' +
       '<label class="cfield"><i class="fa-solid fa-building"></i><input class="cinput" name="affiliation" maxlength="70" placeholder="Affiliation — university, company" value="' + esc(u.affiliation || '') + '"></label>' +
       '<label class="cfield"><i class="fa-solid fa-lightbulb"></i><input class="cinput" name="expertise" maxlength="90" placeholder="Expertise — comma separated topics" value="' + esc(u.expertise || '') + '"></label>' +
       '</div></div>' +
@@ -997,6 +1063,13 @@
         '<span class="admin-link-sub">Connected Google Sheet — all tables</span></span>' +
         '<i class="fa-solid fa-arrow-up-right-from-square admin-link-ext"></i></a>');
     }
+    if (d.uploadsUrl) {
+      resourceLinks.push('<a class="admin-link" href="' + esc(d.uploadsUrl) + '" target="_blank" rel="noopener">' +
+        '<span class="admin-link-icon drive"><i class="fa-brands fa-google-drive"></i></span>' +
+        '<span class="admin-link-body"><span class="admin-link-title">Uploads folder</span>' +
+        '<span class="admin-link-sub">Google Drive — profile &amp; team images</span></span>' +
+        '<i class="fa-solid fa-arrow-up-right-from-square admin-link-ext"></i></a>');
+    }
     var resourcesPanel = '<div class="panel" style="margin-bottom:22px"><h3><i class="fa-solid fa-link"></i>Database &amp; resources</h3>' +
       (resourceLinks.length
         ? '<div class="admin-links">' + resourceLinks.join('') + '</div>'
@@ -1120,8 +1193,14 @@
     ].filter(Boolean);
     var ytIn = $('#ytInput');
     var video = fd.get('video') || (ytIn && ytId(ytIn.value) ? 'https://youtu.be/' + ytId(ytIn.value) : '');
+    var first = String(fd.get('firstName') || '').trim();
+    var last = String(fd.get('lastName') || '').trim();
     return {
-      name: fd.get('name'),
+      // first/last recombine into the single stored display name; firstName &
+      // lastName are also sent so the backend can mint firstname@designthinking.lk.
+      name: (first + ' ' + last).trim(),
+      firstName: first,
+      lastName: last,
       image: fd.get('image'),
       affiliation: fd.get('affiliation'),
       gender: fd.get('gender'),
@@ -1161,6 +1240,7 @@
         if (!/^#\/?$/.test(location.hash || '#/')) location.hash = '#/'; else route();
         break;
       }
+      case 'toggle-chat': { var cp = $('#chatpane'); if (cp) setChatPane(cp.hidden); break; }
       case 'new-team': teamForm(); break;
       case 'edit-team': {
         var team = null;

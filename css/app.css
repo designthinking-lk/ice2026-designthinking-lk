@@ -382,6 +382,8 @@ textarea.input { resize: vertical; min-height: 90px; }
   transition: background-color 100000s ease 0s;
 }
 .cname { font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: -0.01em; }
+.cname-row { display: flex; gap: 8px; }
+.cname-row .cname { flex: 1; min-width: 0; }
 .cfield { display: flex; align-items: center; gap: 8px; }
 .cfield > i { width: 15px; text-align: center; color: rgba(255,255,255,0.7); font-size: 12px; flex: none; }
 .cfield:has(.cinput:not(:placeholder-shown):not(:focus)) > i { color: rgba(255,255,255,0.9); }
@@ -493,6 +495,7 @@ table.admin tr:last-child td { border-bottom: none; }
   font-size: 16px; color: #fff;
 }
 .admin-link-icon.db { background: var(--gradient-brand); }
+.admin-link-icon.drive { background: #1a73e8; }
 .admin-link-body { display: flex; flex-direction: column; min-width: 0; }
 .admin-link-title { font-weight: 600; font-size: 14.5px; }
 .admin-link-sub { color: var(--text-muted); font-size: 13px; }
@@ -607,10 +610,71 @@ table.admin tr:last-child td { border-bottom: none; }
 }
 .oct-pvrole { display: block; font-weight: 600; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.85; margin-top: 3px; }
 
+/* -------------------------------------------------------------- chat pane */
+.chat-toggle {
+  width: 38px; height: 38px; flex: none; border-radius: 10px;
+  border: 1px solid var(--border); background: #fff; cursor: pointer;
+  color: var(--text-body); font-size: 15px; display: inline-flex;
+  align-items: center; justify-content: center; transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.chat-toggle:hover { background: var(--bg-subtle); border-color: var(--border-strong); color: var(--text); }
+.chat-toggle[hidden] { display: none; }
+body.chat-open .chat-toggle { background: var(--color-accent-light); border-color: var(--color-accent); color: var(--color-accent-dark); }
+
+.chatpane {
+  flex: none; width: 300px; height: 100vh; background: #fff;
+  border-left: 1px solid var(--border); display: flex; flex-direction: column;
+}
+.chatpane[hidden] { display: none; }
+.chatpane-head {
+  flex: none; display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 16px 16px 16px 18px; border-bottom: 1px solid var(--border); min-height: 60px;
+}
+.chatpane-head h3 { margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.chatpane-close {
+  background: none; border: none; cursor: pointer; color: var(--text-muted);
+  font-size: 16px; width: 30px; height: 30px; border-radius: 8px; flex: none;
+}
+.chatpane-close:hover { background: var(--bg-subtle); color: var(--text); }
+.chatpane-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
+.chatpane-empty {
+  padding: 40px 22px; text-align: center; color: var(--text-muted); font-size: 13px;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.chatpane-empty i { font-size: 24px; opacity: 0.45; }
+.chat-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  background: none; border: none; cursor: pointer; padding: 9px 10px;
+  border-radius: 10px; font: inherit; color: var(--text);
+}
+.chat-row:hover { background: var(--bg-subtle); }
+.chat-row .avatar-sm { flex: none; }
+.chat-row-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.chat-row-name {
+  font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chat-row-star { color: var(--color-accent); font-size: 10px; }
+.chat-row-sub {
+  font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chat-row-go { flex: none; color: var(--text-muted); font-size: 12px; opacity: 0; transition: opacity 0.15s; }
+.chat-row:hover .chat-row-go { opacity: 1; }
+.chat-row.loading .chat-row-go { opacity: 1; animation: rot 0.7s linear infinite; }
+.chatpane-foot {
+  flex: none; display: block; text-align: center; padding: 13px; border-top: 1px solid var(--border);
+  font-size: 13px; font-weight: 600; color: var(--color-accent-dark); text-decoration: none;
+}
+.chatpane-foot:hover { background: var(--bg-subtle); }
+
 /* -------------------------------------------------------------- responsive */
 @media (max-width: 860px) {
   .detail-grid, .msg-layout { grid-template-columns: 1fr; }
   .form-row { grid-template-columns: 1fr; }
   .pf-grid { grid-template-columns: 1fr; gap: 24px; }
   .profile-edit { max-width: 620px; }
+  /* On narrow screens the pane floats over the content instead of squeezing it. */
+  .chatpane {
+    position: fixed; top: 0; right: 0; z-index: 60; width: min(320px, 88vw);
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.16);
+  }
 }

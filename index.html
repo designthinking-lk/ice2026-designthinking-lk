@@ -49,12 +49,24 @@
 
     <div class="main">
       <header class="topbar">
+        <button class="chat-toggle" id="chatToggle" type="button" data-action="toggle-chat" aria-label="Workshop chat" title="Workshop chat" hidden>
+          <i class="fa-regular fa-comments"></i>
+        </button>
         <div class="topbar-actions" id="topbarActions">
           <!-- filled by app.js: sign-in button, register button + avatar menu -->
         </div>
       </header>
       <main id="view" class="view"></main>
     </div>
+
+    <aside class="chatpane" id="chatpane" hidden aria-label="Workshop chat">
+      <div class="chatpane-head">
+        <h3><i class="fa-regular fa-comments"></i> Workshop chat</h3>
+        <button class="chatpane-close" type="button" data-action="toggle-chat" aria-label="Close chat"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="chatpane-body" id="chatpaneBody"></div>
+      <a class="chatpane-foot" href="https://chat.google.com" target="_blank" rel="noopener">Open Google Chat <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+    </aside>
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
