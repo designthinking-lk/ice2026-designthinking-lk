@@ -53,7 +53,9 @@
   function signOut() {
     setToken(null);
     localStorage.removeItem(CACHE_KEY);
-    location.hash = '#/';
+    sessionStorage.removeItem(ROUTE_KEY);
+    // Hard reset to the public home so no member state can survive the reload.
+    location.replace(location.pathname + location.search + '#/');
     location.reload();
   }
 

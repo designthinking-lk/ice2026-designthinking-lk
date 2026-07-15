@@ -169,21 +169,33 @@
     });
   }
 
-  function userMenu() {
-    var d = state.data;
-    var items =
-      '<a class="conv" href="#/profile/' + esc(d.me.id) + '" data-action="close-modal"><i class="fa-regular fa-user"></i> My profile</a>' +
-      '<a class="conv" href="#/me" data-action="close-modal"><i class="fa-solid fa-pen"></i> Edit profile</a>' +
-      (d.isAdmin ? '<a class="conv" href="#/admin" data-action="close-modal"><i class="fa-solid fa-shield-halved"></i> Admin</a>' : '') +
-      '<a class="conv" href="#" data-action="sign-out"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sign out</a>';
-    modal('<h2>' + esc(d.me.name) + '</h2><div class="conv-list">' + items + '</div>');
+  // Small dropdown anchored under the avatar button (not a full-screen modal).
+  function openMenu(kind) {
+    var pop = $('#menuPop');
+    if (!pop) return;
+    if (!pop.hidden && pop.getAttribute('data-kind') === kind) { closeMenu(); return; }
+    var d = state.data || {};
+    var items;
+    if (kind === 'user' && d.me) {
+      items =
+        '<div class="menu-head">' + esc(d.me.name) + '</div>' +
+        '<a class="menu-item" href="#/profile/' + esc(d.me.id) + '" data-action="menu-nav"><i class="fa-regular fa-user"></i>My profile</a>' +
+        '<a class="menu-item" href="#/me" data-action="menu-nav"><i class="fa-solid fa-pen"></i>Edit profile</a>' +
+        (d.isAdmin ? '<a class="menu-item" href="#/admin" data-action="menu-nav"><i class="fa-solid fa-shield-halved"></i>Admin</a>' : '') +
+        '<div class="menu-sep"></div>' +
+        '<button class="menu-item danger" data-action="sign-out"><i class="fa-solid fa-arrow-right-from-bracket"></i>Sign out</button>';
+    } else {
+      // Signed in but not registered — the "Complete registration" CTA already
+      // lives in the topbar, so the menu only needs sign-out.
+      items = '<button class="menu-item danger" data-action="sign-out"><i class="fa-solid fa-arrow-right-from-bracket"></i>Sign out</button>';
+    }
+    pop.innerHTML = items;
+    pop.setAttribute('data-kind', kind);
+    pop.hidden = false;
   }
-
-  function guestMenu() {
-    var items =
-      '<a class="conv" href="#/register" data-action="close-modal"><i class="fa-solid fa-user-plus"></i> Complete registration</a>' +
-      '<a class="conv" href="#" data-action="sign-out"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sign out</a>';
-    modal('<h2>Account</h2><div class="conv-list">' + items + '</div>');
+  function closeMenu() {
+    var pop = $('#menuPop');
+    if (pop) { pop.hidden = true; pop.removeAttribute('data-kind'); }
   }
 
   // ------------------------------------------------------------- chat pane
@@ -698,6 +710,7 @@
       wirePhotoGestures(vp);
       var hint = $('#photoHint');
       if (hint) hint.hidden = false;
+      updateJoinState(); // a photo now exists — may complete the form
     };
     img.src = url;
   }
@@ -800,6 +813,7 @@
     if (hid) hid.value = id ? 'https://youtu.be/' + id : '';
     box.innerHTML = ytCardHtml(url);
     wireYt();
+    updateJoinState();
     if (id) {
       fetch('https://noembed.com/embed?url=' + encodeURIComponent('https://youtu.be/' + id))
         .then(function (r) { return r.json(); })
@@ -903,9 +917,9 @@
       '<div class="idband"></div>' +
       '<textarea class="cinput cbio" name="bio" maxlength="260" placeholder="Short bio — who you are, what excites you">' + esc(u.bio || '') + '</textarea>' +
       '<div class="idlinks">' +
-      '<label class="cfield"><i class="fa-brands fa-github"></i><input class="cinput" name="linkGithub" maxlength="200" placeholder="github.com/you" value="' + esc(lg) + '"></label>' +
-      '<label class="cfield"><i class="fa-solid fa-globe"></i><input class="cinput" name="linkWebsite" maxlength="200" placeholder="yourwebsite.com" value="' + esc(lw) + '"></label>' +
-      '<label class="cfield"><i class="fa-brands fa-linkedin-in"></i><input class="cinput" name="linkLinkedin" maxlength="200" placeholder="linkedin.com/in/you" value="' + esc(ll) + '"></label>' +
+      '<label class="cfield"><i class="fa-brands fa-github"></i><input class="cinput" name="linkGithub" maxlength="200" placeholder="github.com/you" value="' + esc(lg) + '"><span class="link-status" id="ls_linkGithub" data-status=""></span></label>' +
+      '<label class="cfield"><i class="fa-solid fa-globe"></i><input class="cinput" name="linkWebsite" maxlength="200" placeholder="yourwebsite.com" value="' + esc(lw) + '"><span class="link-status" id="ls_linkWebsite" data-status=""></span></label>' +
+      '<label class="cfield"><i class="fa-brands fa-linkedin-in"></i><input class="cinput" name="linkLinkedin" maxlength="200" placeholder="linkedin.com/in/you" value="' + esc(ll) + '"><span class="link-status" id="ls_linkLinkedin" data-status=""></span></label>' +
       '</div>' +
       '<div class="idcard-foot"><span class="idcard-url">' + esc(C.EVENT_TAGLINE) + '</span>' +
       '<button type="button" class="flip-btn" data-action="flip-card"><i class="fa-solid fa-rotate"></i><span>Front</span></button></div>' +
@@ -966,6 +980,48 @@
     if (lower.indexOf(s.toLowerCase()) !== -1) return;
     $('#skillInput').insertAdjacentHTML('beforebegin', tagChip(s));
     renderSkillSuggestions();
+    saveRegDraft();
+    updateJoinState();
+  }
+
+  // ---- registration draft autosave (localStorage) ----
+  // Only the fresh-registration form is persisted (data-new="1"); editing an
+  // existing profile isn't, to avoid a stale draft shadowing live data.
+  var REG_DRAFT_KEY = 'ice2026.regdraft';
+
+  function collectRegDraft() {
+    var form = $('#profileForm');
+    if (!form || form.getAttribute('data-new') !== '1') return null;
+    var fd = new FormData(form);
+    return {
+      firstName: fd.get('firstName') || '', lastName: fd.get('lastName') || '',
+      affiliation: fd.get('affiliation') || '', expertise: fd.get('expertise') || '',
+      bio: fd.get('bio') || '', gender: fd.get('gender') || '',
+      linkGithub: fd.get('linkGithub') || '', linkWebsite: fd.get('linkWebsite') || '',
+      linkLinkedin: fd.get('linkLinkedin') || '', video: fd.get('video') || '',
+      image: fd.get('image') || '', skills: getTagValues(),
+    };
+  }
+  function saveRegDraft() {
+    var d = collectRegDraft();
+    if (!d) return;
+    try { localStorage.setItem(REG_DRAFT_KEY, JSON.stringify(d)); } catch (e) { /* quota */ }
+  }
+  function loadRegDraft() {
+    try { return JSON.parse(localStorage.getItem(REG_DRAFT_KEY) || 'null'); } catch (e) { return null; }
+  }
+  function clearRegDraft() { localStorage.removeItem(REG_DRAFT_KEY); }
+
+  // Draft → the user-shaped object profileForm() expects (name recombined,
+  // links re-bucketed by hostname into the github/website/linkedin fields).
+  function draftToUser(d) {
+    if (!d) return null;
+    return {
+      name: ((d.firstName || '') + ' ' + (d.lastName || '')).trim(),
+      affiliation: d.affiliation, expertise: d.expertise, bio: d.bio, gender: d.gender,
+      image: d.image, video: d.video, skills: d.skills || [],
+      links: [d.linkGithub, d.linkWebsite, d.linkLinkedin].filter(Boolean),
+    };
   }
 
   function viewRegister() {
@@ -982,7 +1038,7 @@
     setTimeout(afterProfileForm, 0);
     return profileScaffold('Welcome to ' + esc(C.EVENT_NAME),
       'Set up your public profile so mentors and other participants can find you.',
-      profileForm(null, true));
+      profileForm(draftToUser(loadRegDraft()), true));
   }
 
   function viewMe() {
@@ -997,9 +1053,88 @@
       (sub ? '<p style="color:var(--text-body)">' + sub + '</p>' : '') + inner + '</div>';
   }
 
+  // ---- link existence check + Join-button gating ----
+  // Registration requires every field complete; the three web links are verified
+  // server-side (js -> check_url) and must resolve before Join enables.
+  var LINK_FIELDS = ['linkGithub', 'linkWebsite', 'linkLinkedin'];
+  var linkStatus = {};   // field -> 'empty' | 'checking' | 'ok' | 'bad'
+  var linkTimers = {};   // debounce handles
+  var linkSeq = {};      // race guard: only the latest check per field wins
+
+  function setLinkStatus(field, status) {
+    linkStatus[field] = status;
+    var el = document.getElementById('ls_' + field);
+    if (el) {
+      el.setAttribute('data-status', status);
+      el.innerHTML =
+        status === 'checking' ? '<i class="fa-solid fa-spinner fa-spin"></i>' :
+        status === 'ok' ? '<i class="fa-solid fa-circle-check"></i>' :
+        status === 'bad' ? '<i class="fa-solid fa-triangle-exclamation"></i>' : '';
+    }
+    updateJoinState();
+  }
+
+  function checkLink(field, rawValue) {
+    var v = normUrl(rawValue);
+    if (!v) { setLinkStatus(field, 'empty'); return; }
+    setLinkStatus(field, 'checking');
+    var seq = (linkSeq[field] = (linkSeq[field] || 0) + 1);
+    A.api('check_url', { url: v }).then(function (r) {
+      if (seq !== linkSeq[field]) return; // a newer keystroke superseded this
+      setLinkStatus(field, r && r.exists ? 'ok' : 'bad');
+    }).catch(function () {
+      if (seq !== linkSeq[field]) return;
+      setLinkStatus(field, 'bad');
+    });
+  }
+
+  function wireLinkChecks(pform) {
+    LINK_FIELDS.forEach(function (f) {
+      var input = pform.querySelector('[name="' + f + '"]');
+      if (!input) return;
+      if (input.value.trim()) checkLink(f, input.value); else setLinkStatus(f, 'empty');
+      input.addEventListener('input', function () {
+        setLinkStatus(f, input.value.trim() ? 'checking' : 'empty');
+        clearTimeout(linkTimers[f]);
+        linkTimers[f] = setTimeout(function () {
+          if (input.value.trim()) checkLink(f, input.value); else setLinkStatus(f, 'empty');
+        }, 600);
+      });
+    });
+  }
+
+  // Enable Join only when the whole card is complete (new registrations only).
+  function updateJoinState() {
+    var form = $('#profileForm');
+    if (!form || form.getAttribute('data-new') !== '1') return;
+    var btn = form.querySelector('button[type="submit"]');
+    if (!btn) return;
+    var fd = new FormData(form);
+    var has = function (n) { return String(fd.get(n) || '').trim().length > 0; };
+    var photoOk = !!photoEd || has('image');
+    var textOk = has('firstName') && has('lastName') && has('affiliation') && has('expertise') && has('bio');
+    var skillsOk = getTagValues().length > 0;
+    var videoOk = !!ytId(fd.get('video') || ($('#ytInput') && $('#ytInput').value) || '');
+    var linksOk = LINK_FIELDS.every(function (f) { return linkStatus[f] === 'ok'; });
+    var complete = photoOk && textOk && skillsOk && videoOk && linksOk;
+    btn.disabled = !complete;
+    btn.classList.toggle('btn-disabled', !complete);
+  }
+
   function afterProfileForm() {
     photoEd = null; // fresh form; only set when the user picks a new photo
+    linkStatus = {}; linkTimers = {}; linkSeq = {};
     renderSkillSuggestions();
+    var pform = $('#profileForm');
+    if (pform) {
+      wireLinkChecks(pform); // verify links + show ✓/⚠ (both new and edit forms)
+      if (pform.getAttribute('data-new') === '1') {
+        // Autosave the fresh-registration form + re-evaluate the Join gate.
+        var onEdit = function () { saveRegDraft(); updateJoinState(); };
+        pform.addEventListener('input', onEdit);
+        pform.addEventListener('change', onEdit);
+      }
+    }
     var vid = $('#profileForm [name="video"]');
     if (vid && vid.value) ytRender(vid.value); else wireYt();
     var file = $('#photoFile');
@@ -1016,6 +1151,10 @@
         if (flat !== bio.value) bio.value = flat;
       });
     }
+    // Also re-evaluate the Join gate whenever the YouTube field changes.
+    var ytIn = $('#ytInput');
+    if (ytIn) ytIn.addEventListener('input', updateJoinState);
+    updateJoinState(); // initial state (disabled until everything is complete)
   }
 
   // ----------------------------------------------------------------- admin
@@ -1105,6 +1244,7 @@
 
   function route() {
     var hash = location.hash || '#/';
+    closeMenu();
     // Drop an open announcement draft when leaving the news page.
     if (annDraft.open && !/^#\/announcements$/.test(hash)) annDraft = { open: false, editing: null };
     var view = $('#view');
@@ -1230,9 +1370,10 @@
 
     switch (action) {
       case 'sign-in': A.signIn(); break;
-      case 'sign-out': e.preventDefault(); closeModal(); A.signOut(); break;
-      case 'user-menu': userMenu(); break;
-      case 'guest-menu': guestMenu(); break;
+      case 'sign-out': e.preventDefault(); closeMenu(); A.signOut(); break;
+      case 'user-menu': e.preventDefault(); openMenu('user'); break;
+      case 'guest-menu': e.preventDefault(); openMenu('guest'); break;
+      case 'menu-nav': closeMenu(); break; // let the anchor navigate
       case 'close-modal': closeModal(); break;
       case 'filter-skill': {
         var s = t.getAttribute('data-skill');
@@ -1333,9 +1474,21 @@
         break;
       }
       case 'add-tag': addTag(t.getAttribute('data-skill')); break;
-      case 'rm-tag': t.closest('.chip').remove(); renderSkillSuggestions(); break;
+      case 'rm-tag': t.closest('.chip').remove(); renderSkillSuggestions(); saveRegDraft(); updateJoinState(); break;
       case 'focus-tags': { var si3 = $('#skillInput'); if (si3 && e.target === t) si3.focus(); break; }
     }
+  });
+
+  // Close the avatar dropdown on an outside click or Escape.
+  document.addEventListener('click', function (e) {
+    var pop = $('#menuPop');
+    if (!pop || pop.hidden) return;
+    if (e.target.closest('#menuPop')) return;
+    if (e.target.closest('[data-action="user-menu"],[data-action="guest-menu"]')) return;
+    closeMenu();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeMenu();
   });
 
   document.addEventListener('change', async function (e) {
@@ -1379,6 +1532,7 @@
         var payload = collectProfile(form);
         var isNew = form.getAttribute('data-new') === '1';
         await A.api(isNew ? 'register' : 'update_profile', payload);
+        if (isNew) clearRegDraft();
         photoEd = null;
         await refresh();
         toast(isNew ? 'Welcome aboard' : 'Profile saved');

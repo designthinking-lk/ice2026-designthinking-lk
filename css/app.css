@@ -32,6 +32,26 @@ button { font-family: inherit; }
 }
 .topbar-actions { display: flex; align-items: center; gap: 10px; }
 
+/* Avatar dropdown menu (anchored under the profile button; not a modal) */
+.topbar { position: relative; }
+.menu-pop {
+  position: absolute; top: calc(100% - 4px); right: 16px; z-index: 70;
+  min-width: 210px; padding: 6px; background: #fff;
+  border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-md);
+}
+.menu-pop[hidden] { display: none; }
+.menu-head { padding: 8px 12px 6px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.menu-item {
+  display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+  padding: 9px 12px; border-radius: 8px; font: inherit; font-size: 14px; color: var(--text);
+  background: none; border: none; cursor: pointer; text-decoration: none;
+}
+.menu-item:hover { background: var(--bg-subtle); }
+.menu-item i { width: 16px; text-align: center; color: var(--text-muted); font-size: 13px; }
+.menu-sep { height: 1px; background: var(--border); margin: 5px 6px; }
+.menu-item.danger { color: #b3261e; }
+.menu-item.danger i { color: inherit; }
+
 /* ----------------------------------------------------------------- sidebar */
 .sidebar {
   width: 64px; flex: none;
@@ -131,6 +151,7 @@ button { font-family: inherit; }
 .btn-ghost:hover { background: var(--bg-subtle); color: var(--text); }
 .btn-danger { background: #fff; border-color: #e5b3b3; color: #b3261e; }
 .btn-danger:hover { background: #fdf3f2; }
+.btn:disabled, .btn.btn-disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; filter: saturate(0.6); }
 .btn-sm { padding: 7px 14px; font-size: 13.5px; }
 .btn[disabled] { opacity: 0.55; pointer-events: none; }
 .btn .spin { display: none; }
@@ -387,6 +408,11 @@ textarea.input { resize: vertical; min-height: 90px; }
 .cfield { display: flex; align-items: center; gap: 8px; }
 .cfield > i { width: 15px; text-align: center; color: rgba(255,255,255,0.7); font-size: 12px; flex: none; }
 .cfield:has(.cinput:not(:placeholder-shown):not(:focus)) > i { color: rgba(255,255,255,0.9); }
+/* live link check indicator at the end of each web field */
+.link-status { flex: none; width: 15px; text-align: center; font-size: 12px; }
+.link-status[data-status="checking"] { color: rgba(255,255,255,0.65); }
+.link-status[data-status="ok"] { color: #4ade80; }
+.link-status[data-status="bad"] { color: #f87171; }
 .idcard-foot {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   border-top: 1px solid rgba(255,255,255,0.18); padding-top: 12px;
