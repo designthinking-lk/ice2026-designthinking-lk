@@ -120,6 +120,14 @@
     var d = state.data || {};
     var actions = $('#topbarActions');
     var navMsg = $('#navMessages');
+    // Projects & Tools are for logged-in users; Admin only for admins.
+    var loggedIn = signedIn();
+    var navProjects = $('#navProjects');
+    var navTools = $('#navTools');
+    var navAdmin = $('#navAdmin');
+    if (navProjects) navProjects.hidden = !loggedIn;
+    if (navTools) navTools.hidden = !loggedIn;
+    if (navAdmin) navAdmin.hidden = !d.isAdmin;
     if (signedIn() && d.me) {
       navMsg.hidden = false;
       actions.innerHTML =
@@ -938,6 +946,26 @@
 
   // ----------------------------------------------------------------- admin
 
+  // ---- Projects & Tools (logged-in only; placeholder content for now) ----
+
+  function signInGate(what) {
+    return '<div class="empty" style="margin-top:40px"><i class="fa-solid fa-lock"></i>' +
+      'Sign in to view ' + esc(what) + '.<br><br>' +
+      '<button class="btn btn-gradient" data-action="sign-in"><i class="fa-brands fa-google"></i>Sign in with Google</button></div>';
+  }
+
+  function viewProjects() {
+    if (!signedIn()) return signInGate('projects');
+    return '<div class="section-head" style="margin-top:16px"><h2 style="font-size:30px">Projects</h2></div>' +
+      '<div class="empty"><i class="fa-solid fa-diagram-project"></i>Projects are coming soon.<br>This is where teams will showcase what they are building.</div>';
+  }
+
+  function viewTools() {
+    if (!signedIn()) return signInGate('tools');
+    return '<div class="section-head" style="margin-top:16px"><h2 style="font-size:30px">Tools</h2></div>' +
+      '<div class="empty"><i class="fa-solid fa-toolbox"></i>Tools are coming soon.<br>Handy links and resources for the workshop will live here.</div>';
+  }
+
   function viewAdmin() {
     var d = state.data;
     if (!d) return skeletons();
@@ -953,7 +981,24 @@
         '</select></td>' +
         '<td><button class="btn btn-ghost btn-sm" data-action="del-user" data-id="' + esc(u.id) + '" data-name="' + esc(u.name) + '"><i class="fa-regular fa-trash-can"></i></button></td></tr>';
     }).join('');
+    // Admin resource links. The database link is only present when the backend
+    // exposes it (dbUrl in the bootstrap payload, admins only).
+    var resourceLinks = [];
+    if (d.dbUrl) {
+      resourceLinks.push('<a class="admin-link" href="' + esc(d.dbUrl) + '" target="_blank" rel="noopener">' +
+        '<span class="admin-link-icon db"><i class="fa-solid fa-database"></i></span>' +
+        '<span class="admin-link-body"><span class="admin-link-title">Main database</span>' +
+        '<span class="admin-link-sub">Connected Google Sheet — all tables</span></span>' +
+        '<i class="fa-solid fa-arrow-up-right-from-square admin-link-ext"></i></a>');
+    }
+    var resourcesPanel = '<div class="panel" style="margin-bottom:22px"><h3><i class="fa-solid fa-link"></i>Database &amp; resources</h3>' +
+      (resourceLinks.length
+        ? '<div class="admin-links">' + resourceLinks.join('') + '</div>'
+        : '<p style="color:var(--text-muted);margin:0">No linked resources yet.</p>') +
+      '</div>';
+
     return '<div class="section-head" style="margin-top:16px"><h2 style="font-size:30px">Admin</h2></div>' +
+      resourcesPanel +
       '<div class="panel" style="margin-bottom:22px"><h3><i class="fa-solid fa-toggle-on"></i>Event settings</h3>' +
       '<label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="regToggle" ' + (d.registrationOpen ? 'checked' : '') + ' data-action="toggle-reg"> Registration open</label></div>' +
       '<div class="panel" style="margin-bottom:22px"><h3><i class="fa-solid fa-bullhorn"></i>Announcements</h3>' +
@@ -971,6 +1016,8 @@
     { re: /^#\/profile\/([\w-]+)$/, view: viewProfile },
     { re: /^#\/teams$/, view: viewTeams },
     { re: /^#\/team\/([\w-]+)$/, view: viewTeam },
+    { re: /^#\/projects$/, view: viewProjects },
+    { re: /^#\/tools$/, view: viewTools },
     { re: /^#\/announcements$/, view: viewAnnouncements },
     { re: /^#\/register$/, view: viewRegister },
     { re: /^#\/me$/, view: viewMe },
