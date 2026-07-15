@@ -410,7 +410,7 @@
     var d = state.data;
     if (!d) return skeletons();
     var teams = (d.teams || []).slice().sort(function (a, b) { return a.createdAt < b.createdAt ? 1 : -1; });
-    var head = '<div class="section-head" style="margin-top:16px"><h2 style="font-size:30px">Teams</h2>' +
+    var head = '<div class="section-head section-actions">' +
       (me() ? '<button class="btn btn-gradient btn-sm" data-action="new-team"><i class="fa-solid fa-plus"></i>Create team</button>' : '') + '</div>';
     if (!teams.length) {
       return head + '<div class="empty"><i class="fa-solid fa-people-group"></i>No teams yet.' +
@@ -512,7 +512,7 @@
       if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
       return a.createdAt < b.createdAt ? 1 : -1;
     });
-    var head = '<div class="section-head" style="margin-top:16px"><h2 style="font-size:30px">Announcements</h2>' +
+    var head = '<div class="section-head section-actions">' +
       (canPost && !annDraft.open ? '<button class="btn btn-gradient btn-sm" data-action="new-ann"><i class="fa-solid fa-plus"></i>New announcement</button>' : '') + '</div>';
     var draft = (canPost && annDraft.open) ? annDraftCard(annDraft.editing) : '';
     var list = anns.length
@@ -956,14 +956,12 @@
 
   function viewProjects() {
     if (!signedIn()) return signInGate('projects');
-    return '<div class="section-head" style="margin-top:16px"><h2 style="font-size:30px">Projects</h2></div>' +
-      '<div class="empty"><i class="fa-solid fa-diagram-project"></i>Projects are coming soon.<br>This is where teams will showcase what they are building.</div>';
+    return '<div class="empty" style="margin-top:40px"><i class="fa-solid fa-diagram-project"></i>Projects are coming soon.<br>This is where teams will showcase what they are building.</div>';
   }
 
   function viewTools() {
     if (!signedIn()) return signInGate('tools');
-    return '<div class="section-head" style="margin-top:16px"><h2 style="font-size:30px">Tools</h2></div>' +
-      '<div class="empty"><i class="fa-solid fa-toolbox"></i>Tools are coming soon.<br>Handy links and resources for the workshop will live here.</div>';
+    return '<div class="empty" style="margin-top:40px"><i class="fa-solid fa-toolbox"></i>Tools are coming soon.<br>Handy links and resources for the workshop will live here.</div>';
   }
 
   function viewAdmin() {
@@ -997,7 +995,7 @@
         : '<p style="color:var(--text-muted);margin:0">No linked resources yet.</p>') +
       '</div>';
 
-    return '<div class="section-head" style="margin-top:16px"><h2 style="font-size:30px">Admin</h2></div>' +
+    return '<div style="margin-top:8px"></div>' +
       resourcesPanel +
       '<div class="panel" style="margin-bottom:22px"><h3><i class="fa-solid fa-toggle-on"></i>Event settings</h3>' +
       '<label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="regToggle" ' + (d.registrationOpen ? 'checked' : '') + ' data-action="toggle-reg"> Registration open</label></div>' +
