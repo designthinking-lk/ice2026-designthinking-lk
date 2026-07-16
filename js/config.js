@@ -1,6 +1,10 @@
-// ICE2026 frontend configuration
+// ICE frontend configuration (multi-project).
+// Per-project branding (name, tagline, site URL, registration/provisioning
+// flags) lives in the central registry sheet and arrives via bootstrap —
+// EVENT_NAME/EVENT_TAGLINE below are only pre-bootstrap fallbacks.
 window.ICE_CONFIG = {
-  EVENT_NAME: 'ICE2026',
+  DEFAULT_PROJECT: 'ice2026',
+  EVENT_NAME: 'ICE',
   EVENT_TAGLINE: 'Innovation & Collaboration Experience',
   API_URL: 'https://script.google.com/macros/s/AKfycbz0THh0OrmG8umv5ZomVvv1kQu7Ogs1jYp2tKqJFOe6gAMWGnL5Y5_Ww5hZOFVeNSA/exec',
   AUTH_URL: 'https://script.google.com/macros/s/AKfycbwvFYU1o9pwCePbf3mTINgqsZhbVeeCX97M3rG76DN74sLSyJRDdXXqaqbnbTlVPONZ/exec',

@@ -1,4 +1,4 @@
-/* ICE2026 — Google Chat handoff.
+/* ICE — Google Chat handoff.
  * Messaging happens in real Google Chat between workshop Workspace accounts.
  * "Message" buttons call spaces.setup (creates or returns the 1:1 DM) with a
  * user-granted OAuth token, then open the DM's chat.google.com URL.

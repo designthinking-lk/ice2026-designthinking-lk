@@ -1,5 +1,8 @@
-/* ICE2026 — single-file application: hash router + views.
- * No framework: template strings + event delegation. */
+/* ICE — single-file application: hash router + views.
+ * No framework: template strings + event delegation.
+ * Multi-project: A.getProject() names the active project; per-project
+ * branding arrives in bootstrap (state.data.project) and every project-scoped
+ * localStorage key carries the project slug. */
 (function () {
   'use strict';
 
@@ -84,6 +87,20 @@
 
   function me() { return state.data && state.data.me; }
   function signedIn() { return !!A.getToken(); }
+
+  // Per-project branding from bootstrap; config values are only the
+  // pre-bootstrap fallback shown before the first payload arrives.
+  function proj() { return (state.data && state.data.project) || {}; }
+  function eventName() { return proj().name || C.EVENT_NAME; }
+  function eventTagline() { return proj().tagline || C.EVENT_TAGLINE; }
+  function siteUrl() { return proj().siteUrl || location.host; }
+  // "ICE2026" renders as ICE + emphasised year wherever the brand is shown.
+  function brandHtml(bold) {
+    var m = String(eventName()).match(/^([A-Za-z]+)(\d+)$/);
+    var tagOpen = bold ? '<b>' : '<span class="brand-year">';
+    var tagClose = bold ? '</b>' : '</span>';
+    return m ? esc(m[1]) + tagOpen + esc(m[2]) + tagClose : esc(eventName());
+  }
   function isMentor() { var m = me(); return !!(m && m.role === 'mentor'); }
   // Mentors and admins may post announcements.
   function canAnnounce() { return !!(state.data && (state.data.isAdmin || isMentor())); }
@@ -105,9 +122,16 @@
       renderChrome();
       route(); // re-render current view with fresh data
     } catch (err) {
+      // A stale/deleted project selection must not brick the app — fall back
+      // to the default project once.
+      if (err.code === 'unknown_project' && A.getProject() !== C.DEFAULT_PROJECT) {
+        A.setProject(C.DEFAULT_PROJECT);
+        state.data = A.readCache();
+        return refresh();
+      }
       if (!state.data) {
         $('#view').innerHTML = '<div class="empty"><i class="fa-solid fa-plug-circle-xmark"></i>' +
-          'Could not reach the ICE2026 server.<br>' + esc(err.message || '') +
+          'Could not reach the ' + esc(eventName()) + ' server.<br>' + esc(err.message || '') +
           '<br><br><button class="btn btn-outline" onclick="location.reload()">Retry</button></div>';
       } else {
         toast('Could not refresh data: ' + (err.message || 'network error'), true);
@@ -119,6 +143,10 @@
 
   function renderChrome() {
     var d = state.data || {};
+    // Sidebar brand follows the active project's name.
+    var brandName = $('.brand-name');
+    if (brandName) brandName.innerHTML = brandHtml(false);
+    renderProjectSwitcher(d);
     var actions = $('#topbarActions');
     var navMsg = $('#navMessages');
     // Projects & Tools are for logged-in users; Admin only for admins.
@@ -154,7 +182,7 @@
       if (pane && !pane.hidden) { pane.hidden = true; document.body.classList.remove('chat-open'); }
     } else {
       renderChatPane();
-      if (localStorage.getItem('ice2026.chat') === 'open' && $('#chatpane') && $('#chatpane').hidden) {
+      if (localStorage.getItem(chatKey()) === 'open' && $('#chatpane') && $('#chatpane').hidden) {
         $('#chatpane').hidden = false;
         document.body.classList.add('chat-open');
       }
@@ -168,6 +196,37 @@
                (key === 'teams' && hash.indexOf('#/team/') === 0);
       a.classList.toggle('active', !!on);
     });
+  }
+
+  // Project switcher — a <select> between the brand and the nav. Hidden until
+  // bootstrap lists more than one visible project. Switching swaps in the
+  // target project's cached bootstrap (per-project cache keys — no
+  // bleed-through) and refreshes.
+  function renderProjectSwitcher(d) {
+    var box = $('#projectSwitcher');
+    if (!box) return;
+    var projects = d.projects || [];
+    var current = A.getProject();
+    if (projects.length < 2) { box.hidden = true; box.innerHTML = ''; return; }
+    box.hidden = false;
+    box.innerHTML = '<select class="project-select" data-action="switch-project" aria-label="Switch project">' +
+      projects.map(function (p) {
+        return '<option value="' + esc(p.id) + '"' + (p.id === current ? ' selected' : '') + '>' +
+          esc(p.name) + (p.status === 'test' ? ' (test)' : p.status === 'archived' ? ' (archived)' : '') + '</option>';
+      }).join('') + '</select>';
+  }
+
+  function switchProject(id) {
+    if (!id || id === A.getProject()) return;
+    A.setProject(id);
+    teamDetailCache = {};
+    state.data = A.readCache(); // instant if this project was loaded before
+    state.loaded = false;
+    state.q = ''; state.roleFilter = 'all'; state.skillFilter = null; state.teamFilter = null;
+    adminProjects = null;
+    renderChrome();
+    route();
+    refresh();
   }
 
   // Small dropdown anchored under the avatar button (not a full-screen modal).
@@ -202,6 +261,8 @@
   // ------------------------------------------------------------- chat pane
   // Toggleable right rail listing everyone who has a workshop @designthinking.lk
   // account; clicking opens the 1:1 Google Chat DM (js/chat.js).
+
+  function chatKey() { return 'ice.chat.' + A.getProject(); }
 
   function workEmailOf(u) {
     var w = u && u.workEmail;
@@ -238,7 +299,7 @@
     if (!pane) return;
     pane.hidden = !open;
     document.body.classList.toggle('chat-open', open);
-    localStorage.setItem('ice2026.chat', open ? 'open' : 'closed');
+    localStorage.setItem(chatKey(), open ? 'open' : 'closed');
     if (open) { renderChatPane(); fitWordmark(); }
     else requestAnimationFrame(fitWordmark);
   }
@@ -935,7 +996,7 @@
 
       // ---------------- front
       '<div class="idface idfront">' +
-      '<div class="idcard-head"><span class="idcard-brand">ICE<b>2026</b></span>' +
+      '<div class="idcard-head"><span class="idcard-brand">' + brandHtml(true) + '</span>' +
       '<span class="idcard-type">' + (u.role === 'mentor' ? 'MENTOR' : 'MEMBER') + '</span></div>' +
       '<div class="idcard-main">' +
       '<div class="idcard-photo"><div class="photo-vp" id="photoVp">' +
@@ -963,7 +1024,7 @@
       '<div class="cskill-tags" id="skillTags">' + skills.slice(0, 3).map(cardChip).join('') + '</div>' +
       '<button type="button" class="cskill-add" id="skillAddBtn" data-action="open-skills"><i class="fa-solid fa-plus"></i>Add skill</button>' +
       '</div>' +
-      '<div class="idcard-foot"><span class="idcard-url">ice2026.designthinking.lk</span>' +
+      '<div class="idcard-foot"><span class="idcard-url">' + esc(siteUrl()) + '</span>' +
       '<button type="button" class="flip-btn" data-action="flip-card"><i class="fa-solid fa-rotate"></i><span>More on the back</span></button></div>' +
       // skill picker — a temporary overlay over the card front
       '<div class="cskill-overlay" id="skillOverlay" hidden>' +
@@ -984,7 +1045,7 @@
       '<label class="cfield"><i class="fa-solid fa-globe"></i><input class="cinput" name="linkWebsite" maxlength="200" placeholder="yourwebsite.com" value="' + esc(lw) + '"><span class="link-status" id="ls_linkWebsite" data-status=""></span></label>' +
       '<label class="cfield"><i class="fa-brands fa-linkedin-in"></i><input class="cinput" name="linkLinkedin" maxlength="200" placeholder="linkedin.com/in/you" value="' + esc(ll) + '"><span class="link-status" id="ls_linkLinkedin" data-status=""></span></label>' +
       '</div>' +
-      '<div class="idcard-foot"><span class="idcard-url">' + esc(C.EVENT_TAGLINE) + '</span>' +
+      '<div class="idcard-foot"><span class="idcard-url">' + esc(eventTagline()) + '</span>' +
       '<button type="button" class="flip-btn" data-action="flip-card"><i class="fa-solid fa-rotate"></i><span>Front</span></button></div>' +
       '</div>' +
 
@@ -999,7 +1060,7 @@
       '<input type="hidden" name="video" value="' + (vid ? 'https://youtu.be/' + esc(vid) : '') + '"></div>' +
 
       '<div class="form-status" id="profileStatus"></div>' +
-      '<div class="form-actions"><button class="btn btn-gradient" type="submit"><span class="label">' + (isNew ? 'Join ' + esc(C.EVENT_NAME) : 'Save changes') + '</span><span class="spin"></span></button></div>' +
+      '<div class="form-actions"><button class="btn btn-gradient" type="submit"><span class="label">' + (isNew ? 'Join ' + esc(eventName()) : 'Save changes') + '</span><span class="spin"></span></button></div>' +
       '</div>' + // .pf-right
       '</form>';
   }
@@ -1094,7 +1155,9 @@
   // ---- registration draft autosave (localStorage) ----
   // Only the fresh-registration form is persisted (data-new="1"); editing an
   // existing profile isn't, to avoid a stale draft shadowing live data.
-  var REG_DRAFT_KEY = 'ice2026.regdraft';
+  // Keyed per project — a draft started in a test project must never surface
+  // in another project's register form.
+  function regDraftKey() { return 'ice.regdraft.' + A.getProject(); }
 
   function collectRegDraft() {
     var form = $('#profileForm');
@@ -1112,12 +1175,12 @@
   function saveRegDraft() {
     var d = collectRegDraft();
     if (!d) return;
-    try { localStorage.setItem(REG_DRAFT_KEY, JSON.stringify(d)); } catch (e) { /* quota */ }
+    try { localStorage.setItem(regDraftKey(), JSON.stringify(d)); } catch (e) { /* quota */ }
   }
   function loadRegDraft() {
-    try { return JSON.parse(localStorage.getItem(REG_DRAFT_KEY) || 'null'); } catch (e) { return null; }
+    try { return JSON.parse(localStorage.getItem(regDraftKey()) || 'null'); } catch (e) { return null; }
   }
-  function clearRegDraft() { localStorage.removeItem(REG_DRAFT_KEY); }
+  function clearRegDraft() { localStorage.removeItem(regDraftKey()); }
 
   // Draft → the user-shaped object profileForm() expects (name recombined,
   // links re-bucketed by hostname into the github/website/linkedin fields).
@@ -1140,12 +1203,17 @@
     if (state.data && !state.data.registrationOpen) {
       return '<div class="empty" style="margin-top:40px"><i class="fa-solid fa-door-closed"></i>Registration is closed. Contact the organizers if you believe this is a mistake.</div>';
     }
-    if (!formReady()) return profileScaffold('Welcome to ' + esc(C.EVENT_NAME),
+    if (!formReady()) return profileScaffold('Welcome to ' + esc(eventName()),
       'Set up your public profile so mentors and other participants can find you.', formLoading());
     setTimeout(afterProfileForm, 0);
-    return profileScaffold('Welcome to ' + esc(C.EVENT_NAME),
-      'Set up your public profile so mentors and other participants can find you.',
-      profileForm(draftToUser(loadRegDraft()), true));
+    // A local draft wins; otherwise a returning person (known in the
+    // cross-project directory) starts from their last profile.
+    var prefill = state.data && state.data.prefill;
+    var seed = draftToUser(loadRegDraft()) || (prefill && prefill.profile) || null;
+    var sub = (prefill && prefill.profile)
+      ? 'Welcome back! We’ve filled in your profile from last time — check it over and join.'
+      : 'Set up your public profile so mentors and other participants can find you.';
+    return profileScaffold('Welcome to ' + esc(eventName()), sub, profileForm(seed, true));
   }
 
   function viewMe() {
@@ -1280,6 +1348,17 @@
     if (!form || form.getAttribute('data-new') !== '1') return;
     var box = $('#proposedEmail');
     if (!box) return;
+    // Returning person: they keep the account they already have — show it
+    // instead of proposing (and checking) a fresh address.
+    var prefill = state.data && state.data.prefill;
+    if (prefill && prefill.workEmail) {
+      setProposedEmailUI('ok', prefill.workEmail);
+      var st0 = $('#cemailStatus');
+      if (st0) st0.innerHTML = '<i class="fa-solid fa-circle-check" title="Your existing workshop account — you keep it"></i>';
+      return;
+    }
+    // No workshop accounts are minted in this project (test projects).
+    if (proj().provisionAccounts === false) { box.hidden = true; return; }
     var fd = new FormData(form);
     var f = emailHandle(fd.get('firstName'));
     var l = emailHandle(fd.get('lastName'));
@@ -1385,6 +1464,56 @@
     return '<div class="empty" style="margin-top:40px"><i class="fa-solid fa-toolbox"></i>Tools are coming soon.<br>Handy links and resources for the workshop will live here.</div>';
   }
 
+  // Full registry rows, lazily fetched for the admin Projects panel (global
+  // admins only — the backend rejects everyone else). null = not loaded yet.
+  var adminProjects = null;
+
+  function projectsPanel(d) {
+    if (!d.registryUrl) return ''; // only global admins manage projects
+    var inner;
+    if (!adminProjects) {
+      inner = '<div class="skeleton" style="height:60px"></div>';
+      A.api('admin_list_projects').then(function (r) {
+        adminProjects = r.projects || [];
+        if (location.hash === '#/admin') route();
+      }).catch(function (err) { toast(err.message, true); });
+    } else {
+      var current = A.getProject();
+      inner = '<div class="table-wrap"><table class="admin">' +
+        '<thead><tr><th>Project</th><th>Status</th><th>Registration</th><th>Accounts</th><th></th></tr></thead><tbody>' +
+        adminProjects.map(function (p) {
+          return '<tr><td><b>' + esc(p.name) + '</b> <span style="color:var(--text-muted);font-size:13px">' + esc(p.id) + '</span></td>' +
+            '<td><select class="input" style="padding:5px 10px;font-size:13px" data-action="proj-status" data-proj="' + esc(p.id) + '">' +
+            ['active', 'test', 'archived'].map(function (s) { return '<option' + ((p.status || 'active') === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') +
+            '</select></td>' +
+            '<td><label style="cursor:pointer;white-space:nowrap"><input type="checkbox" data-action="proj-reg" data-proj="' + esc(p.id) + '"' + (p.registrationOpen === 'true' ? ' checked' : '') + '> open</label></td>' +
+            '<td><label style="cursor:pointer;white-space:nowrap" title="Mint @designthinking.lk accounts on registration"><input type="checkbox" data-action="proj-prov" data-proj="' + esc(p.id) + '"' + (p.provisionAccounts === 'true' ? ' checked' : '') + '> mint</label></td>' +
+            '<td>' + (p.id === current
+              ? '<span class="role-tag admin">current</span>'
+              : '<button class="btn btn-ghost btn-sm" data-action="switch-project-btn" data-proj="' + esc(p.id) + '">Switch</button>') + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+    }
+    return '<div class="panel" style="margin-bottom:22px"><h3><i class="fa-solid fa-layer-group"></i>Projects</h3>' + inner +
+      '<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">' +
+      '<button class="btn btn-outline btn-sm" data-action="new-project"><i class="fa-solid fa-plus"></i>New project</button>' +
+      '<a class="btn btn-ghost btn-sm" href="' + esc(d.registryUrl) + '" target="_blank" rel="noopener">Registry sheet <i class="fa-solid fa-arrow-up-right-from-square"></i></a>' +
+      '</div></div>';
+  }
+
+  function projectForm() {
+    modal('<h2>New project</h2><form class="form" id="projectForm">' +
+      '<div class="field"><label>Project id <span class="hint">lowercase letters, digits, hyphens — e.g. ice2027, test-1</span></label>' +
+      '<input class="input" name="id" required pattern="[a-z0-9][a-z0-9-]{1,29}" maxlength="30" placeholder="ice2027"></div>' +
+      '<div class="field"><label>Name</label><input class="input" name="name" required maxlength="60" placeholder="ICE2027"></div>' +
+      '<div class="field"><label>Tagline <span class="hint">optional</span></label><input class="input" name="tagline" maxlength="200" value="' + esc(C.EVENT_TAGLINE) + '"></div>' +
+      '<div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" name="isTest"> Test project — only admins see it in the switcher</label></div>' +
+      '<div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" name="provision"> Mint @designthinking.lk accounts on registration</label></div>' +
+      '<p class="hint" style="margin:0;color:var(--text-muted);font-size:13px">The project’s Google Sheet and Drive folder are created automatically on first use.</p>' +
+      '<div class="form-status" id="projectFormStatus"></div>' +
+      '<div class="form-actions"><button class="btn btn-gradient" type="submit"><span class="label">Create project</span><span class="spin"></span></button>' +
+      '<button class="btn btn-ghost" type="button" data-action="close-modal">Cancel</button></div></form>');
+  }
+
   function viewAdmin() {
     var d = state.data;
     if (!d) return skeletons();
@@ -1424,8 +1553,9 @@
       '</div>';
 
     return '<div style="margin-top:8px"></div>' +
+      projectsPanel(d) +
       resourcesPanel +
-      '<div class="panel" style="margin-bottom:22px"><h3><i class="fa-solid fa-toggle-on"></i>Event settings</h3>' +
+      '<div class="panel" style="margin-bottom:22px"><h3><i class="fa-solid fa-toggle-on"></i>Event settings <span style="font-weight:400;color:var(--text-muted);font-size:14px">— ' + esc(eventName()) + '</span></h3>' +
       '<label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="regToggle" ' + (d.registrationOpen ? 'checked' : '') + ' data-action="toggle-reg"> Registration open</label></div>' +
       '<div class="panel" style="margin-bottom:22px"><h3><i class="fa-solid fa-bullhorn"></i>Announcements</h3>' +
       '<button class="btn btn-outline btn-sm" data-action="new-ann"><i class="fa-solid fa-plus"></i>New announcement</button> ' +
@@ -1712,6 +1842,8 @@
         break;
       }
       case 'add-typed-skill': { var si3 = $('#skillInput'); if (si3) { addTag(si3.value); si3.value = ''; si3.focus(); } break; }
+      case 'new-project': projectForm(); break;
+      case 'switch-project-btn': switchProject(t.getAttribute('data-proj')); break;
     }
   });
 
@@ -1741,8 +1873,32 @@
       try {
         var r = await A.api('admin_set_config', { registrationOpen: t.checked });
         toast('Registration is now ' + (r.registrationOpen ? 'open' : 'closed'));
+        adminProjects = null;
         refresh();
       } catch (err) { toast(err.message, true); }
+    }
+    if (t.getAttribute('data-action') === 'switch-project') {
+      switchProject(t.value);
+    }
+    // Inline project editors in the admin Projects panel — each row targets
+    // its own project via an explicit `project` override.
+    var pa = t.getAttribute('data-action');
+    if (pa === 'proj-status' || pa === 'proj-reg' || pa === 'proj-prov') {
+      var pid = t.getAttribute('data-proj');
+      var patch = { project: pid };
+      if (pa === 'proj-status') patch.status = t.value;
+      if (pa === 'proj-reg') patch.registrationOpen = t.checked;
+      if (pa === 'proj-prov') patch.provisionAccounts = t.checked;
+      try {
+        await A.api('admin_update_project', patch);
+        adminProjects = null;
+        toast('Project updated');
+        refresh(); // projects list + current-project flags may have changed
+      } catch (err) {
+        toast(err.message, true);
+        adminProjects = null;
+        if (location.hash === '#/admin') route(); // revert the control
+      }
     }
   });
 
@@ -1806,6 +1962,27 @@
       submitAnn(form, true, btn);
     }
 
+    if (form.id === 'projectForm') {
+      busy(btn, true);
+      var fdp = new FormData(form);
+      try {
+        await A.api('admin_create_project', {
+          id: fdp.get('id'),
+          name: fdp.get('name'),
+          tagline: fdp.get('tagline'),
+          status: fdp.get('isTest') ? 'test' : 'active',
+          provisionAccounts: !!fdp.get('provision'),
+        });
+        closeModal();
+        adminProjects = null;
+        toast('Project created');
+        refresh(); // pulls the updated projects list into the switcher
+      } catch (err) {
+        $('#projectFormStatus').textContent = err.message;
+        busy(btn, false);
+      }
+    }
+
     if (form.id === 'linkForm') {
       busy(btn, true);
       var fd3 = new FormData(form);
@@ -1832,10 +2009,10 @@
     var sidebar = $('#sidebar');
     var toggle = $('#sidebarToggle');
     if (!sidebar || !toggle) return;
-    if (localStorage.getItem('ice2026.sidebar') === 'expanded') sidebar.classList.add('expanded');
+    if (localStorage.getItem('ice.sidebar') === 'expanded') sidebar.classList.add('expanded');
     toggle.addEventListener('click', function () {
       var expanded = sidebar.classList.toggle('expanded');
-      localStorage.setItem('ice2026.sidebar', expanded ? 'expanded' : 'collapsed');
+      localStorage.setItem('ice.sidebar', expanded ? 'expanded' : 'collapsed');
       toggle.setAttribute('aria-label', expanded ? 'Collapse menu' : 'Expand menu');
     });
     // The content area resizes when the sidebar expands/collapses; rebuild the
@@ -1846,6 +2023,12 @@
   })();
 
   (function boot() {
+    // ?project=<slug> deep-links into a specific project (e.g. a next-year
+    // invite link) — it becomes the sticky selection.
+    try {
+      var qp = new URLSearchParams(location.search).get('project');
+      if (qp) A.setProject(qp.toLowerCase());
+    } catch (e) { /* old browser */ }
     var justSignedIn = A.absorbLoginToken();
     state.data = A.readCache();
     renderChrome();

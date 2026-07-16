@@ -1,19 +1,53 @@
-/* ICE2026 API client — talks to the Apps Script backend.
- * POST with Content-Type text/plain = CORS "simple request", no preflight. */
+/* ICE API client — talks to the Apps Script backend.
+ * POST with Content-Type text/plain = CORS "simple request", no preflight.
+ *
+ * Multi-project: the signed-in identity (token) is GLOBAL — one sign-in works
+ * across every project. Everything project-scoped (bootstrap cache, and in
+ * app.js the register draft and chat state) is keyed per project slug so
+ * switching projects can never leak one project's data into another. */
 (function () {
   'use strict';
 
   var C = window.ICE_CONFIG;
-  var TOKEN_KEY = 'ice2026.token';
-  var CACHE_KEY = 'ice2026.bootstrap';
-  var ROUTE_KEY = 'ice2026.postLoginRoute';
+  var TOKEN_KEY = 'ice.token';
+  var PROJECT_KEY = 'ice.project';
+  var ROUTE_KEY = 'ice.postLoginRoute';
+
+  // One-time migration of pre-multi-project localStorage keys, so nobody has
+  // to sign in again (or lose a register draft) when this frontend ships.
+  (function migrateLegacyKeys() {
+    var moves = {
+      'ice2026.token': TOKEN_KEY,
+      'ice2026.bootstrap': 'ice.bootstrap.ice2026',
+      'ice2026.regdraft': 'ice.regdraft.ice2026',
+      'ice2026.chat': 'ice.chat.ice2026',
+      'ice2026.sidebar': 'ice.sidebar',
+    };
+    try {
+      Object.keys(moves).forEach(function (oldKey) {
+        var v = localStorage.getItem(oldKey);
+        if (v !== null) {
+          if (localStorage.getItem(moves[oldKey]) === null) localStorage.setItem(moves[oldKey], v);
+          localStorage.removeItem(oldKey);
+        }
+      });
+    } catch (e) { /* private mode */ }
+  })();
 
   function getToken() { return localStorage.getItem(TOKEN_KEY) || null; }
   function setToken(t) { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); }
 
+  function getProject() { return localStorage.getItem(PROJECT_KEY) || C.DEFAULT_PROJECT; }
+  function setProject(id) {
+    id ? localStorage.setItem(PROJECT_KEY, id) : localStorage.removeItem(PROJECT_KEY);
+  }
+
+  function cacheKey() { return 'ice.bootstrap.' + getProject(); }
+
   /** Core call. Returns parsed JSON; throws Error with .code on failure. */
   async function api(action, params) {
     var body = Object.assign({ action: action }, params || {});
+    if (!body.project) body.project = getProject();
     var token = getToken();
     if (token && !body.token) body.token = token;
     var res = await fetch(C.API_URL, {
@@ -52,7 +86,13 @@
 
   function signOut() {
     setToken(null);
-    localStorage.removeItem(CACHE_KEY);
+    // Signing out is global (one identity) — drop every project's cached
+    // bootstrap so no member state survives the reload.
+    try {
+      Object.keys(localStorage)
+        .filter(function (k) { return k.indexOf('ice.bootstrap.') === 0; })
+        .forEach(function (k) { localStorage.removeItem(k); });
+    } catch (e) { /* private mode */ }
     sessionStorage.removeItem(ROUTE_KEY);
     // Hard reset to the public home so no member state can survive the reload.
     location.replace(location.pathname + location.search + '#/');
@@ -60,16 +100,18 @@
   }
 
   function readCache() {
-    try { return JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch (e) { return null; }
+    try { return JSON.parse(localStorage.getItem(cacheKey()) || 'null'); } catch (e) { return null; }
   }
   function writeCache(data) {
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch (e) { /* quota */ }
+    try { localStorage.setItem(cacheKey(), JSON.stringify(data)); } catch (e) { /* quota */ }
   }
 
   window.IceApi = {
     api: api,
     getToken: getToken,
     setToken: setToken,
+    getProject: getProject,
+    setProject: setProject,
     signIn: signIn,
     signOut: signOut,
     absorbLoginToken: absorbLoginToken,
