@@ -919,6 +919,8 @@
     box.innerHTML = ytCardHtml(url);
     wireYt();
     updateJoinState();
+    saveRegDraft();
+    renderCardVideo(); // the card backdrop follows the picked video live
     if (id) {
       fetch('https://noembed.com/embed?url=' + encodeURIComponent('https://youtu.be/' + id))
         .then(function (r) { return r.json(); })
@@ -937,6 +939,73 @@
         if (ytId(input.value)) ytRender(input.value);
       });
     }
+  }
+
+  // ---- intro video as the card backdrop ----
+  // The video fills the card above the footer row (~16:9 there), autoplaying
+  // muted on loop at reduced opacity so the card gradient tints through.
+  // A footer speaker button unmutes via the YouTube iframe postMessage API.
+  var cardVideoMuted = true;
+
+  function cardVideoFrame(id) {
+    var qs = 'autoplay=1&mute=1&loop=1&playlist=' + id +
+      '&controls=0&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3&disablekb=1' +
+      '&enablejsapi=1&origin=' + encodeURIComponent(location.origin);
+    return '<iframe id="cardVideoIf" src="https://www.youtube.com/embed/' + esc(id) + '?' + qs + '"' +
+      ' allow="autoplay; encrypted-media" tabindex="-1" title="Intro video backdrop"></iframe>';
+  }
+
+  function renderCardVideo() {
+    var box = $('#cardVideo');
+    if (!box) return;
+    var hid = $('#profileForm [name="video"]');
+    var id = ytId(hid && hid.value);
+    var muteBtn = $('#cardMuteBtn');
+    var label = $('#cardVideoLabel');
+    if (!id) {
+      box.innerHTML = '';
+      box.removeAttribute('data-vid');
+      if (muteBtn) muteBtn.hidden = true;
+      if (label) label.textContent = 'Add video';
+      return;
+    }
+    if (label) label.textContent = '';
+    if (muteBtn) muteBtn.hidden = false;
+    // only rebuild the iframe when the video actually changed, so re-renders
+    // don't restart playback
+    if (box.getAttribute('data-vid') !== id) {
+      box.setAttribute('data-vid', id);
+      box.innerHTML = cardVideoFrame(id);
+      cardVideoMuted = true;
+      setCardMuteIcon();
+    }
+  }
+
+  function cardVideoCmd(func) {
+    var f = $('#cardVideoIf');
+    if (f && f.contentWindow) {
+      f.contentWindow.postMessage(JSON.stringify({ event: 'command', func: func, args: [] }), '*');
+    }
+  }
+
+  function setCardMuteIcon() {
+    var btn = $('#cardMuteBtn');
+    if (!btn) return;
+    btn.innerHTML = '<i class="fa-solid ' + (cardVideoMuted ? 'fa-volume-xmark' : 'fa-volume-high') + '"></i>';
+    btn.title = cardVideoMuted ? 'Unmute video' : 'Mute video';
+  }
+
+  // Add/edit the video URL — the yt-card picker moves into a small modal
+  // opened from the card footer's video button.
+  function openVideoModal() {
+    var hid = $('#profileForm [name="video"]');
+    modal('<h2>Intro video</h2>' +
+      '<p style="color:var(--text-body)">Paste a YouTube link — it plays as your card’s backdrop.</p>' +
+      '<div class="yt-card" id="ytCard">' + ytCardHtml((hid && hid.value) || '') + '</div>' +
+      '<div class="form-actions" style="margin-top:18px"><button class="btn btn-gradient" type="button" data-action="close-modal">Done</button></div>');
+    wireYt();
+    var input = $('#ytInput');
+    if (input) input.focus();
   }
 
   // ---- validation ----
@@ -996,6 +1065,8 @@
 
       // ---------------- front
       '<div class="idface idfront">' +
+      // intro video plays as the card's backdrop (everything above the footer)
+      '<div class="card-video" id="cardVideo"></div>' +
       '<div class="idcard-head"><span class="idcard-brand">' + brandHtml(true) + '</span>' +
       '<span class="idcard-type">' + (u.role === 'mentor' ? 'MENTOR' : 'MEMBER') + '</span></div>' +
       '<div class="idcard-main">' +
@@ -1025,7 +1096,11 @@
       '<button type="button" class="cskill-add" id="skillAddBtn" data-action="open-skills"><i class="fa-solid fa-plus"></i>Add skill</button>' +
       '</div>' +
       '<div class="idcard-foot"><span class="idcard-url">' + esc(siteUrl()) + '</span>' +
-      '<button type="button" class="flip-btn" data-action="flip-card"><i class="fa-solid fa-rotate"></i><span>More on the back</span></button></div>' +
+      '<span class="foot-right">' +
+      '<button type="button" class="foot-icon" id="cardMuteBtn" data-action="card-video-mute" title="Unmute video" hidden><i class="fa-solid fa-volume-xmark"></i></button>' +
+      '<button type="button" class="foot-icon" data-action="card-video-edit" title="Intro video — YouTube link"><i class="fa-solid fa-video"></i><span class="foot-icon-label" id="cardVideoLabel"></span></button>' +
+      '<button type="button" class="flip-btn" data-action="flip-card"><i class="fa-solid fa-rotate"></i><span>More on the back</span></button>' +
+      '</span></div>' +
       // skill picker — a temporary overlay over the card front
       '<div class="cskill-overlay" id="skillOverlay" hidden>' +
       '<div class="cskill-oh"><span>Add skills <b id="skillCount">(0/3)</b></span>' +
@@ -1055,9 +1130,9 @@
       '</div>' + // .pf-left
 
       '<div class="pf-right">' +
-      '<div class="field"><label>Intro video <span class="hint">YouTube, optional</span></label>' +
-      '<div class="yt-card" id="ytCard">' + ytCardHtml(u.video || '') + '</div>' +
-      '<input type="hidden" name="video" value="' + (vid ? 'https://youtu.be/' + esc(vid) : '') + '"></div>' +
+      // intro video lives on the card (backdrop + footer buttons); only the
+      // value travels with the form
+      '<input type="hidden" name="video" value="' + (vid ? 'https://youtu.be/' + esc(vid) : '') + '">' +
 
       '<div class="form-status" id="profileStatus"></div>' +
       '<div class="form-actions"><button class="btn btn-gradient" type="submit"><span class="label">' + (isNew ? 'Join ' + esc(eventName()) : 'Save changes') + '</span><span class="spin"></span></button></div>' +
@@ -1422,8 +1497,7 @@
         updateProposedEmail(); // initial (e.g. restored draft)
       }
     }
-    var vid = $('#profileForm [name="video"]');
-    if (vid && vid.value) ytRender(vid.value); else wireYt();
+    renderCardVideo(); // card backdrop from the stored/drafted video
     var file = $('#photoFile');
     if (file) file.addEventListener('change', function () {
       if (file.files && file.files[0]) photoLoad(file.files[0]);
@@ -1438,9 +1512,6 @@
         if (flat !== bio.value) bio.value = flat;
       });
     }
-    // Also re-evaluate the Join gate whenever the YouTube field changes.
-    var ytIn = $('#ytInput');
-    if (ytIn) ytIn.addEventListener('input', updateJoinState);
     updateJoinState(); // initial state (disabled until everything is complete)
   }
 
@@ -1827,6 +1898,13 @@
         var hid = $('#profileForm [name="video"]');
         if (hid) hid.value = '';
         ytRender('');
+        break;
+      }
+      case 'card-video-edit': openVideoModal(); break;
+      case 'card-video-mute': {
+        cardVideoMuted = !cardVideoMuted;
+        cardVideoCmd(cardVideoMuted ? 'mute' : 'unMute');
+        setCardMuteIcon();
         break;
       }
       case 'add-tag': addTag(t.getAttribute('data-skill')); break;

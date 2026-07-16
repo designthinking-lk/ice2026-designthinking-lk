@@ -502,6 +502,34 @@ textarea.input { resize: vertical; min-height: 90px; }
   border-top: 1px solid rgba(255,255,255,0.18); padding-top: 12px;
 }
 .idcard-url { font-size: 11px; letter-spacing: 0.02em; color: rgba(255,255,255,0.75); }
+.foot-right { display: flex; align-items: center; gap: 7px; flex: none; }
+.foot-icon {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  background: rgba(255,255,255,0.16); color: #fff; border: none; border-radius: 999px;
+  padding: 6px 9px; font-size: 12px; font-weight: 600; font-family: inherit;
+}
+.foot-icon:hover { background: rgba(255,255,255,0.28); }
+.foot-icon[hidden] { display: none; }
+.foot-icon-label:empty { display: none; }
+
+/* intro video as the card backdrop — fills the front above the footer row
+   (roughly 16:9 there). Muted/looping; semi-transparent so the brand
+   gradient tints through. pointer-events off so card fields stay editable. */
+.card-video {
+  position: absolute; left: 0; right: 0; top: 0; bottom: 56px;
+  overflow: hidden; pointer-events: none; z-index: 0;
+}
+.card-video:empty { display: none; }
+.card-video iframe {
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 100%; aspect-ratio: 16 / 9; height: auto; border: 0;
+  opacity: 0.35;
+}
+/* card content paints above the video layer */
+.idfront > .idcard-head,
+.idfront > .idcard-main,
+.idfront > .idcard-skills,
+.idfront > .idcard-foot { position: relative; z-index: 1; }
 .flip-btn {
   display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
   background: rgba(255,255,255,0.16); color: #fff; border: none; border-radius: 999px;
