@@ -910,10 +910,24 @@
       '<span class="cemail-status" id="cemailStatus" data-status=""></span></div>' +
       '<label class="cfield"><i class="fa-solid fa-building"></i><input class="cinput" name="affiliation" maxlength="70" placeholder="Affiliation — university, company" value="' + esc(u.affiliation || '') + '"></label>' +
       '<label class="cfield"><i class="fa-solid fa-lightbulb"></i><input class="cinput" name="expertise" maxlength="90" placeholder="Expertise — comma separated topics" value="' + esc(u.expertise || '') + '"></label>' +
-      '</div></div>' +
+      '</div></div>' + // close .idcard-fields + .idcard-main
+      // skills attach directly on the card front (max 3, one line)
+      '<div class="idcard-skills">' +
+      '<i class="fa-solid fa-wand-magic-sparkles cskill-lead"></i>' +
+      '<div class="cskill-tags" id="skillTags">' + skills.slice(0, 3).map(cardChip).join('') + '</div>' +
+      '<button type="button" class="cskill-add" id="skillAddBtn" data-action="open-skills"><i class="fa-solid fa-plus"></i>Add skill</button>' +
+      '</div>' +
       '<div class="idcard-foot"><span class="idcard-url">ice2026.designthinking.lk</span>' +
       '<button type="button" class="flip-btn" data-action="flip-card"><i class="fa-solid fa-rotate"></i><span>More on the back</span></button></div>' +
+      // skill picker — a temporary overlay over the card front
+      '<div class="cskill-overlay" id="skillOverlay" hidden>' +
+      '<div class="cskill-oh"><span>Add skills <b id="skillCount">(0/3)</b></span>' +
+      '<button type="button" class="cskill-close" data-action="close-skills" aria-label="Done"><i class="fa-solid fa-xmark"></i></button></div>' +
+      '<div class="cskill-inrow"><input id="skillInput" placeholder="Type a skill…" autocomplete="off">' +
+      '<button type="button" class="cskill-addbtn" data-action="add-typed-skill">Add</button></div>' +
+      '<div class="cskill-pool" id="skillPool"></div>' +
       '</div>' +
+      '</div>' + // close .idfront
 
       // ---------------- back
       '<div class="idface idback">' +
@@ -942,49 +956,76 @@
       '<div class="yt-card" id="ytCard">' + ytCardHtml(u.video || '') + '</div>' +
       '<input type="hidden" name="video" value="' + (vid ? 'https://youtu.be/' + esc(vid) : '') + '"></div>' +
 
-      '<div class="field"><label>Skills</label><div class="tag-input" id="skillTags" data-action="focus-tags">' +
-      skills.map(tagChip).join('') +
-      '<input id="skillInput" placeholder="Type a skill and press Enter"></div>' +
-      '<div class="suggestions" id="skillSuggestions"></div></div>' +
-
       '<div class="form-status" id="profileStatus"></div>' +
       '<div class="form-actions"><button class="btn btn-gradient" type="submit"><span class="label">' + (isNew ? 'Join ' + esc(C.EVENT_NAME) : 'Save changes') + '</span><span class="spin"></span></button></div>' +
       '</div>' + // .pf-right
       '</form>';
   }
 
-  function tagChip(s) {
-    return '<span class="chip on" data-skill="' + esc(s) + '">' + esc(s) + '<i class="fa-solid fa-xmark" data-action="rm-tag"></i></span>';
-  }
+  var MAX_SKILLS = 3;
 
-  function renderSkillSuggestions() {
-    var box = $('#skillSuggestions');
-    if (!box) return;
-    var existing = getTagValues();
-    var pool = {};
-    opts('skill', C.SKILL_SUGGESTIONS).forEach(function (s) { pool[s] = 1; });
-    ((state.data && state.data.users) || []).forEach(function (u) { (u.skills || []).forEach(function (s) { pool[s] = 1; }); });
-    var items = Object.keys(pool).filter(function (s) {
-      return existing.map(function(x){return x.toLowerCase();}).indexOf(s.toLowerCase()) === -1;
-    }).slice(0, 14);
-    box.innerHTML = items.map(function (s) {
-      return '<span class="chip" data-action="add-tag" data-skill="' + esc(s) + '"><i class="fa-solid fa-plus" style="font-size:10px"></i>' + esc(s) + '</span>';
-    }).join('');
+  function cardChip(s) {
+    return '<span class="cskill" data-skill="' + esc(s) + '">' + esc(s) +
+      '<i class="fa-solid fa-xmark" data-action="rm-tag" title="Remove"></i></span>';
   }
 
   function getTagValues() {
-    return $all('#skillTags .chip').map(function (c) { return c.getAttribute('data-skill'); });
+    return $all('#skillTags [data-skill]').map(function (c) { return c.getAttribute('data-skill'); });
+  }
+
+  // Sync the card skills row + overlay after any change.
+  function refreshSkillsUI() {
+    var count = getTagValues().length;
+    var addBtn = $('#skillAddBtn');
+    if (addBtn) addBtn.style.display = count >= MAX_SKILLS ? 'none' : '';
+    var cnt = $('#skillCount');
+    if (cnt) cnt.textContent = '(' + count + '/' + MAX_SKILLS + ')';
+    renderSkillPool();
+  }
+
+  // The pick-from list inside the overlay (suggested skills + other users' skills).
+  function renderSkillPool() {
+    var box = $('#skillPool');
+    if (!box) return;
+    var existing = getTagValues().map(function (x) { return x.toLowerCase(); });
+    if (getTagValues().length >= MAX_SKILLS) {
+      box.innerHTML = '<div class="cskill-full">That’s ' + MAX_SKILLS + ' skills — the max. Remove one to swap.</div>';
+      return;
+    }
+    var pool = {};
+    opts('skill', C.SKILL_SUGGESTIONS).forEach(function (s) { pool[s] = 1; });
+    ((state.data && state.data.users) || []).forEach(function (u) { (u.skills || []).forEach(function (s) { pool[s] = 1; }); });
+    var items = Object.keys(pool).filter(function (s) { return existing.indexOf(s.toLowerCase()) === -1; });
+    box.innerHTML = items.map(function (s) {
+      return '<span class="cskill-pick" data-action="add-tag" data-skill="' + esc(s) + '"><i class="fa-solid fa-plus"></i>' + esc(s) + '</span>';
+    }).join('');
   }
 
   function addTag(s) {
     s = String(s || '').trim();
     if (!s) return;
-    var lower = getTagValues().map(function (x) { return x.toLowerCase(); });
-    if (lower.indexOf(s.toLowerCase()) !== -1) return;
-    $('#skillInput').insertAdjacentHTML('beforebegin', tagChip(s));
-    renderSkillSuggestions();
+    var values = getTagValues();
+    if (values.length >= MAX_SKILLS) { toast('You can add up to ' + MAX_SKILLS + ' skills.', true); return; }
+    if (values.map(function (x) { return x.toLowerCase(); }).indexOf(s.toLowerCase()) !== -1) return;
+    var tags = $('#skillTags');
+    if (tags) tags.insertAdjacentHTML('beforeend', cardChip(s));
+    refreshSkillsUI();
     saveRegDraft();
     updateJoinState();
+    if (getTagValues().length >= MAX_SKILLS) closeSkills(); // the third pick finishes
+  }
+
+  function openSkills() {
+    var ov = $('#skillOverlay');
+    if (!ov) return;
+    ov.hidden = false;
+    refreshSkillsUI();
+    var si = $('#skillInput');
+    if (si) { si.value = ''; si.focus(); }
+  }
+  function closeSkills() {
+    var ov = $('#skillOverlay');
+    if (ov) ov.hidden = true;
   }
 
   // ---- registration draft autosave (localStorage) ----
@@ -1203,7 +1244,7 @@
   function afterProfileForm() {
     photoEd = null; // fresh form; only set when the user picks a new photo
     linkStatus = {}; linkTimers = {}; linkSeq = {}; emailSeq = 0;
-    renderSkillSuggestions();
+    refreshSkillsUI();
     var pform = $('#profileForm');
     if (pform) {
       wireLinkChecks(pform); // verify links + show ✓/⚠ (both new and edit forms)
@@ -1375,8 +1416,8 @@
           addTag(skillInput.value.replace(/,$/, ''));
           skillInput.value = '';
         } else if (e.key === 'Backspace' && !skillInput.value) {
-          var chips = $all('#skillTags .chip');
-          if (chips.length) { chips[chips.length - 1].remove(); renderSkillSuggestions(); }
+          var chips = $all('#skillTags [data-skill]');
+          if (chips.length) { chips[chips.length - 1].remove(); refreshSkillsUI(); saveRegDraft(); updateJoinState(); }
         }
       });
     }
@@ -1577,8 +1618,10 @@
         break;
       }
       case 'add-tag': addTag(t.getAttribute('data-skill')); break;
-      case 'rm-tag': t.closest('.chip').remove(); renderSkillSuggestions(); saveRegDraft(); updateJoinState(); break;
-      case 'focus-tags': { var si3 = $('#skillInput'); if (si3 && e.target === t) si3.focus(); break; }
+      case 'rm-tag': e.preventDefault(); t.closest('[data-skill]').remove(); refreshSkillsUI(); saveRegDraft(); updateJoinState(); break;
+      case 'open-skills': openSkills(); break;
+      case 'close-skills': closeSkills(); break;
+      case 'add-typed-skill': { var si3 = $('#skillInput'); if (si3) { addTag(si3.value); si3.value = ''; si3.focus(); } break; }
     }
   });
 
