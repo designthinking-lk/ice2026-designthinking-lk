@@ -1124,10 +1124,27 @@
     btn.classList.toggle('btn-disabled', !complete);
   }
 
-  // ---- name inputs size to content, so first+last read as one name ----
+  // ---- name inputs size to their exact rendered text, so first + last read as
+  // one name with a single natural space between them ----
+  var nameMeasureEl = null;
+  function measureNameWidth(input) {
+    if (!nameMeasureEl) {
+      nameMeasureEl = document.createElement('span');
+      nameMeasureEl.style.cssText = 'position:absolute;top:-9999px;left:-9999px;visibility:hidden;white-space:pre;';
+      document.body.appendChild(nameMeasureEl);
+    }
+    var cs = getComputedStyle(input);
+    nameMeasureEl.style.fontFamily = cs.fontFamily;
+    nameMeasureEl.style.fontSize = cs.fontSize;
+    nameMeasureEl.style.fontWeight = cs.fontWeight;
+    nameMeasureEl.style.fontStyle = cs.fontStyle;
+    nameMeasureEl.style.letterSpacing = cs.letterSpacing;
+    nameMeasureEl.textContent = input.value || input.placeholder || '';
+    return nameMeasureEl.getBoundingClientRect().width;
+  }
   function sizeName(input) {
-    var len = (input.value || input.placeholder || '').length;
-    input.style.width = (len + 1) + 'ch';
+    // +2px leaves room for the caret on focus without visibly widening the text.
+    input.style.width = Math.ceil(measureNameWidth(input) + 2) + 'px';
   }
 
   // ---- proposed workshop email (firstname@designthinking.lk), checked live ----
@@ -1191,12 +1208,17 @@
     if (pform) {
       wireLinkChecks(pform); // verify links + show ✓/⚠ (both new and edit forms)
       // Name inputs size to their content so first + last read as one name.
-      ['firstName', 'lastName'].forEach(function (nm) {
-        var inp = pform.querySelector('[name="' + nm + '"]');
-        if (!inp) return;
+      var nameInputs = ['firstName', 'lastName'].map(function (nm) {
+        return pform.querySelector('[name="' + nm + '"]');
+      }).filter(Boolean);
+      nameInputs.forEach(function (inp) {
         sizeName(inp);
         inp.addEventListener('input', function () { sizeName(inp); });
       });
+      // Re-measure once the display font loads (initial measure may hit the fallback).
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(function () { nameInputs.forEach(sizeName); });
+      }
       var isNew = pform.getAttribute('data-new') === '1';
       if (isNew) {
         // Autosave the fresh-registration form + re-evaluate the Join gate.
