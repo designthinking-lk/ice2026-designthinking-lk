@@ -12,6 +12,7 @@
     q: '',            // directory search
     roleFilter: 'all',
     skillFilter: null,
+    teamFilter: null, // active team highlight on the People hive (team id or null)
   };
 
   // ------------------------------------------------------------- utilities
@@ -306,14 +307,31 @@
     var users = (d.users || []);
     var mentors = users.filter(function (u) { return u.role === 'mentor'; }).length;
     var participants = users.length - mentors;
-    return '<div class="hive">' +
+    // Team filter chips — one per team, sorted by name (Team A, Team B, …).
+    var teams = (d.teams || []).slice().sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
+    var activeTeam = null;
+    teams.forEach(function (x) { if (x.id === state.teamFilter) activeTeam = x; });
+    if (state.teamFilter && !activeTeam) state.teamFilter = null; // team went away
+    var teamBar = teams.length ? '<div class="hive-teams" id="hiveTeams">' +
+      teams.map(function (t) {
+        var n = (t.members || []).length;
+        return '<button class="team-chip' + (t.id === state.teamFilter ? ' on' : '') + '" type="button" ' +
+          'data-action="filter-team" data-team="' + esc(t.id) + '">' + esc(t.name) +
+          '<span class="tc-count">' + n + '</span></button>';
+      }).join('') + '</div>' : '';
+    return '<div class="hive">' + teamBar +
       '<div class="hive-legend">' +
       '<span><span class="dot mentor"></span>' + mentors + ' mentor' + (mentors === 1 ? '' : 's') + '</span>' +
       '<span><span class="dot participant"></span>' + participants + ' participant' + (participants === 1 ? '' : 's') + '</span>' +
       '</div>' +
       '<div class="hive-stage" id="hiveStage"><div class="word" id="word"></div></div>' +
-      '<div class="hive-caption">' + (users.length ? 'Hover a face to preview' : 'Waiting for people to join — slots fill as they register') + '</div>' +
+      '<div class="hive-caption">' + hiveCaptionText(users, activeTeam) + '</div>' +
       '</div>';
+  }
+
+  function hiveCaptionText(users, team) {
+    if (team) return 'Showing ' + esc(team.name) + ' — tap the chip again to clear';
+    return users.length ? 'Hover a face to preview' : 'Waiting for people to join — slots fill as they register';
   }
 
   // The whole ICE wordmark always renders. Cells with no assigned user yet are
@@ -361,6 +379,7 @@
         el.className = 'oct ' + (mentor ? 'm' : 'p');
         el.href = '#/profile/' + u.id;
         el.title = u.name;
+        el.setAttribute('data-uid', u.id);
         el.innerHTML = '<div class="oct-in">' +
           (u.image ? '<img src="' + esc(u.image) + '" alt="" loading="lazy">' : '<span class="oct-blank">' + esc(initials(u.name)) + '</span>') +
           '</div>';
@@ -390,6 +409,23 @@
     word.__preview = preview;
 
     fitWordmark();
+    applyTeamFilter(); // re-assert an active team highlight after any rebuild
+  }
+
+  // Spotlight the octagons of the currently-filtered team (state.teamFilter),
+  // dimming everyone else. No-op when no team is selected. Called on rebuilds
+  // and on chip toggles so no full re-render is needed.
+  function applyTeamFilter() {
+    var word = $('#word');
+    if (!word) return;
+    var team = null;
+    ((state.data && state.data.teams) || []).forEach(function (x) { if (x.id === state.teamFilter) team = x; });
+    var members = {};
+    if (team) (team.members || []).forEach(function (mid) { members[mid] = 1; });
+    word.classList.toggle('teamfocus', !!team);
+    $all('.oct[data-uid]', word).forEach(function (el) {
+      el.classList.toggle('team-member', !!members[el.getAttribute('data-uid')]);
+    });
   }
 
   function showHivePreview(u, mentor, el) {
@@ -1027,7 +1063,7 @@
   }
 
   // ---- gender picker on the name line (icon-only: Male / Female) ----
-  function genderIcon(g) { return g === 'Female' ? 'fa-venus' : 'fa-mars'; }
+  function genderIcon(g) { return g === 'Female' ? 'fa-person-dress' : 'fa-person'; }
 
   function renderGender() {
     var box = $('#cgender');
@@ -1042,8 +1078,8 @@
     } else {
       // expanded: both options
       box.innerHTML =
-        '<button type="button" class="cg-btn' + (val === 'Male' ? ' on' : '') + '" data-action="gender-pick" data-gender="Male" title="Male"><i class="fa-solid fa-mars"></i></button>' +
-        '<button type="button" class="cg-btn' + (val === 'Female' ? ' on' : '') + '" data-action="gender-pick" data-gender="Female" title="Female"><i class="fa-solid fa-venus"></i></button>';
+        '<button type="button" class="cg-btn' + (val === 'Male' ? ' on' : '') + '" data-action="gender-pick" data-gender="Male" title="Male"><i class="fa-solid fa-person"></i></button>' +
+        '<button type="button" class="cg-btn' + (val === 'Female' ? ' on' : '') + '" data-action="gender-pick" data-gender="Female" title="Female"><i class="fa-solid fa-person-dress"></i></button>';
     }
   }
 
@@ -1543,6 +1579,22 @@
         var s = t.getAttribute('data-skill');
         state.skillFilter = state.skillFilter === s ? null : s;
         if (!/^#\/?$/.test(location.hash || '#/')) location.hash = '#/'; else route();
+        break;
+      }
+      case 'filter-team': {
+        var tid = t.getAttribute('data-team');
+        state.teamFilter = state.teamFilter === tid ? null : tid;
+        // Update in place (no rebuild) so the octagons don't flash.
+        $all('#hiveTeams .team-chip').forEach(function (c) {
+          c.classList.toggle('on', c.getAttribute('data-team') === state.teamFilter);
+        });
+        applyTeamFilter();
+        var cap = $('.hive-caption');
+        if (cap) {
+          var team = null;
+          (state.data.teams || []).forEach(function (x) { if (x.id === state.teamFilter) team = x; });
+          cap.innerHTML = hiveCaptionText((state.data && state.data.users) || [], team);
+        }
         break;
       }
       case 'toggle-chat': { var cp = $('#chatpane'); if (cp) setChatPane(cp.hidden); break; }
