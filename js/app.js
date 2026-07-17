@@ -478,8 +478,7 @@
       '<span><span class="dot participant"></span>' + participants + ' participant' + (participants === 1 ? '' : 's') + '</span>' +
       '</div>' +
       '<div class="hive-stage" id="hiveStage"><div class="word" id="word"></div></div>' +
-      '<div class="hive-caption">' + hiveCaptionText(users, activeTeam) + '</div>' +
-      '</div>';
+      '</div>'; // caption lives inside the preview octagon (buildWordmark)
   }
 
   function hiveCaptionText(users, team) {
@@ -558,7 +557,12 @@
     preview.style.width = pw + 'px'; preview.style.height = ph + 'px';
     preview.style.left = ((built.hollow.col + 0.5) * w - minX - pw / 2) + 'px';
     preview.style.top = ((built.hollow.row + 0.5) * w - minY - ph / 2) + 'px';
-    preview.innerHTML = '<div class="oct-pin"><img id="hivePvImg" alt="">' +
+    // the caption sits inside the empty preview octagon (the C's cavity);
+    // it fades out when a hovered member's photo fills the slot
+    var activeTeam = null;
+    ((state.data && state.data.teams) || []).forEach(function (x) { if (x.id === state.teamFilter) activeTeam = x; });
+    preview.innerHTML = '<span class="hive-caption">' + hiveCaptionText(users, activeTeam) + '</span>' +
+      '<div class="oct-pin"><img id="hivePvImg" alt="">' +
       '<span class="oct-pvname"><span id="hivePvNm"></span><span class="oct-pvrole" id="hivePvRole"></span></span></div>';
     word.appendChild(preview);
     word.__preview = preview;

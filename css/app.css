@@ -99,10 +99,17 @@ button { font-family: inherit; }
 .nav .nav-chat { margin-top: auto; }
 .nav .nav-chat[hidden] + a.nav-admin { margin-top: auto; }
 .nav a.nav-admin i { color: var(--text-muted); }
-.nav a.nav-admin.active i { color: rgba(255, 255, 255, 0.7); }
 .nav a:hover { background: var(--bg-subtle); color: var(--text); }
-.nav a.active { background: var(--color-neutral-100); color: #fff; }
-.nav a.active i { color: rgba(255, 255, 255, 0.7); }
+.nav a.active {
+  background: none; color: var(--color-accent);
+  transform-origin: left center;
+  animation: nav-glow 2.8s ease-in-out infinite;
+}
+.nav a.active i { color: var(--color-accent); filter: drop-shadow(0 0 6px rgba(97, 0, 255, 0.45)); }
+@keyframes nav-glow {
+  0%, 100% { transform: scale(1); text-shadow: 0 0 8px rgba(97, 0, 255, 0.3); }
+  50% { transform: scale(1.045); text-shadow: 0 0 16px rgba(97, 0, 255, 0.6); }
+}
 .nav .badge { margin-left: auto; }
 .nav a .ext { margin-left: auto; font-size: 10px; opacity: 0.55; }
 .badge {
@@ -753,13 +760,20 @@ table.admin tr:last-child td { border-bottom: none; }
   background: var(--bg);
 }
 .hive-legend {
-  position: absolute; bottom: 16px; left: 24px; z-index: 6;
-  display: flex; gap: 18px; font-size: 13px; color: var(--text-muted);
+  position: absolute; bottom: 16px; left: 0; right: 0; z-index: 6;
+  display: flex; gap: 18px; justify-content: center; font-size: 13px; color: var(--text-muted);
 }
 .hive-legend .dot { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
 .dot.mentor { background: var(--accent); }
 .dot.participant { background: var(--accent2); }
-.hive-caption { position: absolute; left: 0; right: 0; bottom: 18px; text-align: center; color: #6b707a; font-size: 12.5px; }
+/* caption inside the empty preview octagon (the C's cavity) */
+.oct-preview .hive-caption {
+  position: absolute; inset: 16%; z-index: 0;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; color: var(--text-muted); font-size: 12.5px; line-height: 1.5;
+  transition: opacity 0.25s;
+}
+.oct-preview.on .hive-caption { opacity: 0; }
 .hive-stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .word { position: relative; }
 
@@ -923,7 +937,6 @@ body.chat-open .chat-toggle { background: var(--color-accent-light); border-colo
 /* -------------------------------------------------------------- night mode */
 /* Component tweaks the shared tokens don't cover: the active nav pill is
    near-black, which vanishes against dark surfaces. */
-:root[data-theme="dark"] .nav a.active { background: #2B2E36; }
 :root[data-theme="dark"] .search:focus-within { box-shadow: 0 0 0 3px rgba(144, 77, 255, 0.18); }
 /* app bar + side pane blend seamlessly into the page background at night
    (in day mode they're all white already) */
@@ -942,8 +955,7 @@ body.chat-open .chat-toggle { background: var(--color-accent-light); border-colo
 }
 .nav-chat:hover { background: var(--bg-subtle); color: var(--text); }
 .nav-chat[hidden] { display: none; }
-body.chat-open .nav-chat { background: var(--color-neutral-100); color: #fff; }
-:root[data-theme="dark"] body.chat-open .nav-chat { background: #2B2E36; }
+body.chat-open .nav-chat { color: var(--color-accent); filter: drop-shadow(0 0 6px rgba(97, 0, 255, 0.45)); }
 
 /* Floating pane: full height, ~1/4 of the screen, capped on large displays */
 .commpane {
@@ -986,7 +998,10 @@ body.chat-open .nav-chat { background: var(--color-neutral-100); color: #fff; }
 }
 
 /* team chips relocated to the app bar (People view only) */
-.topbar-teams { margin-right: auto; min-width: 0; overflow-x: auto; display: flex; scrollbar-width: none; }
+.topbar-teams {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  max-width: 62%; min-width: 0; overflow-x: auto; display: flex; scrollbar-width: none;
+}
 .topbar-teams::-webkit-scrollbar { display: none; }
 .topbar-teams .hive-teams {
   position: static; display: flex; flex-wrap: nowrap; gap: 8px;
