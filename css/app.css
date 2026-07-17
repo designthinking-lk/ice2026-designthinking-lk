@@ -161,7 +161,7 @@ button { font-family: inherit; }
 .btn:active { transform: translateY(1px); }
 .btn-primary { background: var(--color-accent); color: #fff; }
 .btn-primary:hover { background: var(--color-accent-dark); color: #fff; }
-.btn-gradient { background: var(--gradient-brand); color: #fff; box-shadow: 0 4px 16px -4px rgba(97, 0, 255, 0.45); }
+.btn-gradient { background: linear-gradient(90deg, var(--gradient-start) 0%, var(--gradient-end) 100%); color: #fff; box-shadow: 0 4px 16px -4px rgba(97, 0, 255, 0.45); }
 .btn-gradient:hover { filter: brightness(1.06); color: #fff; }
 .btn-outline { background: var(--surface); border-color: var(--border-strong); color: var(--text); }
 .btn-outline:hover { border-color: var(--color-accent); color: var(--color-accent); }
@@ -450,10 +450,6 @@ textarea.input { resize: vertical; min-height: 90px; }
 .photo-vp:hover .photo-change { opacity: 1; }
 .photo-change:hover { background: rgba(14,15,17,0.8); }
 .photo-empty ~ .photo-change { display: none; }
-.photo-hint {
-  font-size: 10px; color: rgba(255,255,255,0.75);
-  width: 132px; text-align: center; line-height: 1.45;
-}
 /* name keeps its distance; email / affiliation / expertise sit close together,
    and the block centres against the photo so text spans the photo row */
 .idcard-fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; justify-content: center; }
@@ -600,6 +596,11 @@ textarea.input { resize: vertical; min-height: 90px; }
   position: absolute; left: 0; top: 50%; transform: translateY(-50%);
   width: 100%; aspect-ratio: 16 / 9; height: auto; border: 0;
   opacity: 0.35;
+  animation: cv-reveal 4.2s ease;
+}
+@keyframes cv-reveal {
+  0%, 72% { opacity: 0; }
+  100% { opacity: 0.35; }
 }
 /* card content paints above the video layer */
 .idfront > .idcard-head,

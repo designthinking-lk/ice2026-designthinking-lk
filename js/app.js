@@ -899,8 +899,6 @@
       photoEd.s = photoEd.minS;
       photoPaint();
       wirePhotoGestures(vp);
-      var hint = $('#photoHint');
-      if (hint) hint.hidden = false;
       updateJoinState(); // a photo now exists — may complete the form
     };
     img.src = url;
@@ -1170,12 +1168,12 @@
           '</select><i class="fa-solid fa-caret-down"></i></span>') +
       '</div>' +
       '<div class="idcard-main">' +
-      '<div class="idcard-photo"><div class="photo-vp" id="photoVp">' +
+      '<div class="idcard-photo"><div class="photo-vp" id="photoVp" title="Drag to adjust · scroll to zoom">' +
       (u.image
         ? '<img class="photo-static" src="' + esc(u.image) + '" alt="">'
         : '<div class="photo-empty" data-action="photo-pick"><i class="fa-solid fa-camera"></i><span>Add photo</span></div>') +
       '<button type="button" class="photo-change" data-action="photo-pick" title="Change photo"><i class="fa-solid fa-camera"></i></button>' +
-      '</div><span class="photo-hint" id="photoHint"' + (u.image ? '' : ' hidden') + '>drag to adjust · scroll to zoom</span></div>' +
+      '</div></div>' +
       '<div class="idcard-fields">' +
       '<div class="cname-row">' +
       '<span class="cgender" id="cgender"></span>' +
