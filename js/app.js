@@ -1765,7 +1765,7 @@
     } else {
       var current = A.getProject();
       inner = '<div class="table-wrap"><table class="admin">' +
-        '<thead><tr><th>Project</th><th>Status</th><th>Registration</th><th>Accounts</th><th></th></tr></thead><tbody>' +
+        '<thead><tr><th>Project</th><th>Status</th><th>Registration</th><th>Accounts</th><th>Storage</th><th></th></tr></thead><tbody>' +
         adminProjects.map(function (p) {
           return '<tr><td><b>' + esc(p.name) + '</b> <span style="color:var(--text-muted);font-size:13px">' + esc(p.id) + '</span></td>' +
             '<td><select class="input" style="padding:5px 10px;font-size:13px" data-action="proj-status" data-proj="' + esc(p.id) + '">' +
@@ -1773,6 +1773,14 @@
             '</select></td>' +
             '<td><label style="cursor:pointer;white-space:nowrap"><input type="checkbox" data-action="proj-reg" data-proj="' + esc(p.id) + '"' + (p.registrationOpen === 'true' ? ' checked' : '') + '> open</label></td>' +
             '<td><label style="cursor:pointer;white-space:nowrap" title="Mint @designthinking.lk accounts on registration"><input type="checkbox" data-action="proj-prov" data-proj="' + esc(p.id) + '"' + (p.provisionAccounts === 'true' ? ' checked' : '') + '> mint</label></td>' +
+            '<td class="proj-store">' +
+            (p.dbId
+              ? '<a href="https://docs.google.com/spreadsheets/d/' + esc(p.dbId) + '/edit" target="_blank" rel="noopener" title="Database — Google Sheet"><i class="fa-solid fa-table-cells-large sheet-ic"></i></a>'
+              : '<span class="store-off" title="Sheet is created on first use"><i class="fa-solid fa-table-cells-large"></i></span>') +
+            (p.uploadsFolderId
+              ? '<a href="https://drive.google.com/drive/folders/' + esc(p.uploadsFolderId) + '" target="_blank" rel="noopener" title="Uploads — Google Drive"><i class="fa-brands fa-google-drive drive-ic"></i></a>'
+              : '<span class="store-off" title="Folder is created on first use"><i class="fa-brands fa-google-drive"></i></span>') +
+            '</td>' +
             '<td>' + (p.id === current
               ? '<span class="role-tag admin">current</span>'
               : '<button class="btn btn-ghost btn-sm" data-action="switch-project-btn" data-proj="' + esc(p.id) + '">Switch</button>') + '</td></tr>';
@@ -1782,21 +1790,29 @@
       '<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">' +
       '<button class="btn btn-outline btn-sm" data-action="new-project"><i class="fa-solid fa-plus"></i>New project</button>' +
       '<a class="btn btn-ghost btn-sm" href="' + esc(d.registryUrl) + '" target="_blank" rel="noopener">Registry sheet <i class="fa-solid fa-arrow-up-right-from-square"></i></a>' +
-      '</div></div>';
+      '</div>' +
+      (showNewProject ? newProjectCard() : '') +
+      '</div>';
   }
 
-  function projectForm() {
-    modal('<h2>New project</h2><form class="form" id="projectForm">' +
-      '<div class="field"><label>Project id <span class="hint">lowercase letters, digits, hyphens — e.g. ice2027, test-1</span></label>' +
+  // Inline card under the projects list (no popup).
+  var showNewProject = false;
+
+  function newProjectCard() {
+    return '<form class="form new-project-card" id="projectForm">' +
+      '<h3 style="margin:0"><i class="fa-solid fa-plus"></i> New project</h3>' +
+      '<div class="form-row">' +
+      '<div class="field"><label>Project id <span class="hint">lowercase letters, digits, hyphens</span></label>' +
       '<input class="input" name="id" required pattern="[a-z0-9][a-z0-9-]{1,29}" maxlength="30" placeholder="ice2027"></div>' +
       '<div class="field"><label>Name</label><input class="input" name="name" required maxlength="60" placeholder="ICE2027"></div>' +
+      '</div>' +
       '<div class="field"><label>Tagline <span class="hint">optional</span></label><input class="input" name="tagline" maxlength="200" value="' + esc(C.EVENT_TAGLINE) + '"></div>' +
       '<div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" name="isTest"> Test project — only admins see it in the switcher</label></div>' +
       '<div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" name="provision"> Mint @designthinking.lk accounts on registration</label></div>' +
       '<p class="hint" style="margin:0;color:var(--text-muted);font-size:13px">The project’s Google Sheet and Drive folder are created automatically on first use.</p>' +
       '<div class="form-status" id="projectFormStatus"></div>' +
       '<div class="form-actions"><button class="btn btn-gradient" type="submit"><span class="label">Create project</span><span class="spin"></span></button>' +
-      '<button class="btn btn-ghost" type="button" data-action="close-modal">Cancel</button></div></form>');
+      '<button class="btn btn-ghost" type="button" data-action="cancel-new-project">Cancel</button></div></form>';
   }
 
   // ---- admin sections (one per tab) ----
@@ -1819,39 +1835,23 @@
   }
 
   function adminEventSection(d) {
+    var p = proj();
     return '<div class="panel" style="margin-bottom:22px"><h3><i class="fa-solid fa-toggle-on"></i>Event settings <span style="font-weight:400;color:var(--text-muted);font-size:14px">— ' + esc(eventName()) + '</span></h3>' +
       '<label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="regToggle" ' + (d.registrationOpen ? 'checked' : '') + ' data-action="toggle-reg"> Registration open</label></div>' +
+      '<div class="panel" style="margin-bottom:22px"><h3><i class="fa-regular fa-calendar"></i>Event dates</h3>' +
+      '<div class="date-range">' +
+      '<label>Start <input type="date" class="input" id="evStart" value="' + esc(p.startDate || '') + '"></label>' +
+      '<label>End <input type="date" class="input" id="evEnd" value="' + esc(p.endDate || '') + '"></label>' +
+      '<button class="btn btn-outline btn-sm" data-action="save-dates"><span class="label"><i class="fa-regular fa-floppy-disk"></i> Save dates</span><span class="spin"></span></button>' +
+      '</div>' +
+      '<p class="hint" style="margin:10px 0 0;color:var(--text-muted);font-size:13px">Shown on the home page later.</p></div>' +
       '<div class="panel"><h3><i class="fa-solid fa-bullhorn"></i>Announcements</h3>' +
       '<button class="btn btn-outline btn-sm" data-action="new-ann"><i class="fa-solid fa-plus"></i>New announcement</button> ' +
       '<a class="btn btn-ghost btn-sm" href="#/announcements">Manage on the news page</a></div>';
   }
 
-  function adminResourcesSection(d) {
-    // The database link is only present when the backend exposes it (dbUrl in
-    // the bootstrap payload, admins only).
-    var links = [];
-    if (d.dbUrl) {
-      links.push('<a class="admin-link" href="' + esc(d.dbUrl) + '" target="_blank" rel="noopener">' +
-        '<span class="admin-link-icon db"><i class="fa-solid fa-database"></i></span>' +
-        '<span class="admin-link-body"><span class="admin-link-title">Main database</span>' +
-        '<span class="admin-link-sub">Connected Google Sheet — all tables</span></span>' +
-        '<i class="fa-solid fa-arrow-up-right-from-square admin-link-ext"></i></a>');
-    }
-    if (d.uploadsUrl) {
-      links.push('<a class="admin-link" href="' + esc(d.uploadsUrl) + '" target="_blank" rel="noopener">' +
-        '<span class="admin-link-icon drive"><i class="fa-brands fa-google-drive"></i></span>' +
-        '<span class="admin-link-body"><span class="admin-link-title">Uploads folder</span>' +
-        '<span class="admin-link-sub">Google Drive — profile &amp; team images</span></span>' +
-        '<i class="fa-solid fa-arrow-up-right-from-square admin-link-ext"></i></a>');
-    }
-    return '<div class="panel"><h3><i class="fa-solid fa-link"></i>Database &amp; resources</h3>' +
-      (links.length
-        ? '<div class="admin-links">' + links.join('') + '</div>'
-        : '<p style="color:var(--text-muted);margin:0">No linked resources yet.</p>') +
-      '</div>';
-  }
-
-  // Which admin tab is showing; People is home.
+  // Which admin tab is showing; People is home. (Storage links live inside
+  // each project row — no separate Resources tab.)
   var adminTab = 'people';
 
   function viewAdmin() {
@@ -1862,7 +1862,6 @@
     var tabs = [{ id: 'people', label: 'People (' + users.length + ')' }];
     if (d.registryUrl) tabs.push({ id: 'projects', label: 'Projects' });
     tabs.push({ id: 'event', label: 'Event' });
-    tabs.push({ id: 'resources', label: 'Resources' });
     if (!tabs.some(function (t) { return t.id === adminTab; })) adminTab = 'people';
     var bar = '<div class="admin-tabs">' + tabs.map(function (t) {
       return '<button class="comm-tab' + (t.id === adminTab ? ' active' : '') + '" type="button" data-action="admin-tab" data-tab="' + t.id + '">' + t.label + '</button>';
@@ -1870,9 +1869,9 @@
     var body =
       adminTab === 'projects' ? projectsPanel(d) :
       adminTab === 'event' ? adminEventSection(d) :
-      adminTab === 'resources' ? adminResourcesSection(d) :
       adminPeopleSection(d);
-    return '<div class="admin-wrap">' + bar + '<div class="admin-tabview">' + body + '</div></div>';
+    // tabs sit at the footer, on the same line as the sidebar's Admin item
+    return '<div class="admin-wrap"><div class="admin-tabview">' + body + '</div>' + bar + '</div>';
   }
 
   // ---------------------------------------------------------------- router
@@ -2188,9 +2187,23 @@
         break;
       }
       case 'add-typed-skill': { var si3 = $('#skillInput'); if (si3) { addTag(si3.value); si3.value = ''; si3.focus(); } break; }
-      case 'new-project': projectForm(); break;
+      case 'new-project': showNewProject = true; route(); break;
+      case 'cancel-new-project': showNewProject = false; route(); break;
       case 'switch-project-btn': switchProject(t.getAttribute('data-proj')); break;
       case 'admin-tab': adminTab = t.getAttribute('data-tab'); route(); break;
+      case 'save-dates': {
+        var sd = $('#evStart') ? $('#evStart').value : '';
+        var ed = $('#evEnd') ? $('#evEnd').value : '';
+        if (sd && ed && ed < sd) { toast('End date is before the start date.', true); break; }
+        busy(t, true);
+        try {
+          await A.api('admin_update_project', { startDate: sd, endDate: ed });
+          toast('Event dates saved');
+          await refresh();
+        } catch (err) { toast(err.message, true); }
+        busy(t, false);
+        break;
+      }
     }
   });
 
@@ -2320,7 +2333,7 @@
           status: fdp.get('isTest') ? 'test' : 'active',
           provisionAccounts: !!fdp.get('provision'),
         });
-        closeModal();
+        showNewProject = false;
         adminProjects = null;
         toast('Project created');
         refresh(); // pulls the updated projects list into the switcher

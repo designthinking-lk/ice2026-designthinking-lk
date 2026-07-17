@@ -1079,11 +1079,32 @@ body.hive-full .hive .oct { pointer-events: auto; }
 @media (max-width: 1100px) { .projects-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .projects-grid { grid-template-columns: 1fr; } }
 
-/* admin: tabbed, non-scrolling shell — the active section scrolls inside */
-.admin-wrap { height: 100%; display: flex; flex-direction: column; gap: 20px; max-width: 1100px; margin: 0 auto; width: 100%; }
+/* admin: tabbed, non-scrolling shell — the active section scrolls inside;
+   the tab bar sits at the footer on the Admin item's line */
+.admin-wrap { height: 100%; display: flex; flex-direction: column; gap: 16px; max-width: 1100px; margin: 0 auto; width: 100%; }
 .admin-tabs {
   flex: none; align-self: center; display: flex; gap: 4px;
-  background: var(--bg-subtle); border-radius: 999px; padding: 4px; margin-top: 4px;
+  background: var(--bg-subtle); border-radius: 999px; padding: 4px;
 }
-.admin-tabs .comm-tab { flex: none; padding: 8px 20px; }
-.admin-tabview { flex: 1; min-height: 0; overflow-y: auto; }
+.admin-tabs .comm-tab { flex: none; padding: 7px 20px; }
+.admin-tabview { flex: 1; min-height: 0; overflow-y: auto; padding-top: 8px; }
+
+/* per-project storage icons (sheet + drive) */
+.proj-store { white-space: nowrap; }
+.proj-store a, .proj-store .store-off { display: inline-flex; margin-right: 12px; font-size: 16px; }
+.sheet-ic { color: #188038; }   /* Google Sheets green */
+.drive-ic { color: #4285F4; }   /* Drive blue */
+.store-off { color: var(--text-faint); opacity: 0.5; cursor: default; }
+
+/* inline new-project card under the projects list */
+.new-project-card {
+  margin-top: 18px; padding: 20px;
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+/* event date range */
+.date-range { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+.date-range label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-muted); }
+.date-range input[type="date"] { width: 170px; }
