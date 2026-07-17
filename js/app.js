@@ -88,6 +88,19 @@
   function me() { return state.data && state.data.me; }
   function signedIn() { return !!A.getToken(); }
 
+  // ---- day / night theme ----
+  // data-theme on <html> (also set pre-paint by an inline snippet in
+  // index.html); persisted as ice.theme.
+  function applyTheme(dark) {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    var btn = $('#themeToggle');
+    if (btn) {
+      btn.innerHTML = '<i class="fa-solid ' + (dark ? 'fa-sun' : 'fa-moon') + '"></i>';
+      btn.title = dark ? 'Day mode' : 'Night mode';
+    }
+  }
+  function isDark() { return document.documentElement.getAttribute('data-theme') === 'dark'; }
+
   // Per-project branding from bootstrap; config values are only the
   // pre-bootstrap fallback shown before the first payload arrives.
   function proj() { return (state.data && state.data.project) || {}; }
@@ -165,7 +178,7 @@
     } else if (signedIn()) {
       navMsg.hidden = true;
       actions.innerHTML =
-        '<a class="btn btn-gradient btn-sm" href="#/register"><i class="fa-solid fa-user-plus"></i>Complete registration</a>' +
+        '<a class="btn btn-gradient btn-sm" href="#/register"><i class="fa-regular fa-id-card"></i>Complete registration</a>' +
         '<button class="avatar-circle-btn" data-action="guest-menu" aria-label="Account" title="Account">' +
         '<span class="avatar-guest"><i class="fa-solid fa-user"></i></span></button>';
     } else {
@@ -1919,6 +1932,12 @@
         break;
       }
       case 'toggle-chat': { var cp = $('#chatpane'); if (cp) setChatPane(cp.hidden); break; }
+      case 'toggle-theme': {
+        var dark = !isDark();
+        try { localStorage.setItem('ice.theme', dark ? 'dark' : 'light'); } catch (err) { /* private mode */ }
+        applyTheme(dark);
+        break;
+      }
       case 'new-team': teamForm(); break;
       case 'edit-team': {
         var team = null;
@@ -2218,6 +2237,7 @@
       var qp = new URLSearchParams(location.search).get('project');
       if (qp) A.setProject(qp.toLowerCase());
     } catch (e) { /* old browser */ }
+    applyTheme(localStorage.getItem('ice.theme') === 'dark'); // sync the toggle icon
     var justSignedIn = A.absorbLoginToken();
     state.data = A.readCache();
     renderChrome();

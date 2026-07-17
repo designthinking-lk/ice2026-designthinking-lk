@@ -23,6 +23,8 @@
 
   <link rel="stylesheet" href="css/theme.css">
   <link rel="stylesheet" href="css/app.css">
+  <!-- apply the saved theme before first paint so night mode never flashes -->
+  <script>try{if(localStorage.getItem('ice.theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
 </head>
 <body>
   <div class="shell">
@@ -52,6 +54,9 @@
       <header class="topbar">
         <button class="chat-toggle" id="chatToggle" type="button" data-action="toggle-chat" aria-label="Workshop chat" title="Workshop chat" hidden>
           <i class="fa-regular fa-comments"></i>
+        </button>
+        <button class="theme-toggle" id="themeToggle" type="button" data-action="toggle-theme" aria-label="Toggle night mode" title="Night mode">
+          <i class="fa-solid fa-moon"></i>
         </button>
         <div class="topbar-actions" id="topbarActions">
           <!-- filled by app.js: sign-in button, register button + avatar menu -->
