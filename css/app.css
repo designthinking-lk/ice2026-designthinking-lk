@@ -64,8 +64,8 @@ button { font-family: inherit; }
 /* Half of a large hive octagon, vertically centred, its other half bleeding
    off-screen to the left — the nav options sit inside it. */
 .side-oct {
-  position: absolute; top: 50%; left: -190px; transform: translateY(-50%);
-  width: 380px; height: 380px; z-index: 0; pointer-events: none;
+  position: absolute; top: 50%; left: -160px; transform: translateY(-50%);
+  width: 320px; height: 320px; z-index: 0; pointer-events: none;
   clip-path: url(#octr);
   background: var(--bg-subtle);
 }
@@ -753,7 +753,7 @@ table.admin tr:last-child td { border-bottom: none; }
   background: var(--bg);
 }
 .hive-legend {
-  position: absolute; top: 18px; right: 24px; z-index: 6;
+  position: absolute; bottom: 16px; left: 24px; z-index: 6;
   display: flex; gap: 18px; font-size: 13px; color: var(--text-muted);
 }
 .hive-legend .dot { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
@@ -783,11 +783,8 @@ table.admin tr:last-child td { border-bottom: none; }
    The shape (all 8 sides) is drawn as a ring: a filled octagon in the outline
    colour, with a slightly smaller page-coloured octagon punched out via ::before. */
 .oct.empty { cursor: default; }
-.oct.empty .oct-in { background: var(--border-strong); box-shadow: none; }
-.oct.empty .oct-in::before {
-  content: ""; position: absolute; inset: 2px;
-  background: var(--bg); clip-path: var(--oct);
-}
+/* soft solid fill — no outline ring around the slots */
+.oct.empty .oct-in { background: var(--bg-subtle); box-shadow: none; }
 .oct.empty .oct-in::after { display: none; }
 .oct-slot { position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; color: var(--text-faint); font-size: 22px; }
 .oct.empty:hover { transform: none; }
@@ -806,11 +803,7 @@ table.admin tr:last-child td { border-bottom: none; }
 /* idle: an empty slot octagon so the C's hollow always reads as filled */
 .oct-preview::before {
   content: ""; position: absolute; inset: 0; clip-path: var(--oct);
-  background: var(--border-strong);
-}
-.oct-preview::after {
-  content: ""; position: absolute; inset: 2px; clip-path: var(--oct);
-  background: var(--bg);
+  background: var(--bg-subtle);
 }
 .oct-preview.on { filter: drop-shadow(0 14px 34px rgba(0, 0, 0, 0.6)); }
 .oct-preview .oct-pin { opacity: 0; transition: opacity 0.3s ease, transform 0.3s ease; transform: scale(0.94); }
@@ -1005,7 +998,7 @@ body.chat-open .nav-chat { background: var(--color-neutral-100); color: #fff; }
    letter I's cavity leaving room for the nav. The container ignores the
    pointer so the nav stays clickable; tiles re-enable it themselves. */
 body.hive-full .hive {
-  position: fixed; top: 60px; left: 0; right: 0; bottom: 0;
+  position: fixed; inset: 0;
   background: transparent; pointer-events: none;
 }
 body.hive-full .hive .oct { pointer-events: auto; }
