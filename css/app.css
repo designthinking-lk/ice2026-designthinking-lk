@@ -596,10 +596,10 @@ textarea.input { resize: vertical; min-height: 90px; }
   position: absolute; left: 0; top: 50%; transform: translateY(-50%);
   width: 100%; aspect-ratio: 16 / 9; height: auto; border: 0;
   opacity: 0.35;
-  animation: cv-reveal 4.2s ease;
+  animation: cv-reveal 7s ease;
 }
 @keyframes cv-reveal {
-  0%, 72% { opacity: 0; }
+  0%, 80% { opacity: 0; }  /* ~5.6s hidden — outlasts YouTube's title overlay */
   100% { opacity: 0.35; }
 }
 /* card content paints above the video layer */
