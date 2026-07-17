@@ -1799,11 +1799,11 @@
       '<button class="btn btn-ghost" type="button" data-action="close-modal">Cancel</button></div></form>');
   }
 
-  function viewAdmin() {
-    var d = state.data;
-    if (!d) return skeletons();
-    if (!d.isAdmin) return '<div class="empty" style="margin-top:40px"><i class="fa-solid fa-shield-halved"></i>Admins only.</div>';
+  // ---- admin sections (one per tab) ----
+
+  function adminPeopleSection(d) {
     var users = (d.users || []).slice().sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
+    if (!users.length) return '<div class="empty"><i class="fa-solid fa-users"></i>Nobody has registered yet.</div>';
     var rows = users.map(function (u) {
       return '<tr><td style="display:flex;align-items:center;gap:10px">' + avatar(u, 'avatar-sm') +
         '<a href="#/profile/' + esc(u.id) + '">' + esc(u.name) + '</a></td>' +
@@ -1814,40 +1814,65 @@
         '</select></td>' +
         '<td><button class="btn btn-ghost btn-sm" data-action="del-user" data-id="' + esc(u.id) + '" data-name="' + esc(u.name) + '"><i class="fa-regular fa-trash-can"></i></button></td></tr>';
     }).join('');
-    // Admin resource links. The database link is only present when the backend
-    // exposes it (dbUrl in the bootstrap payload, admins only).
-    var resourceLinks = [];
+    return '<div class="table-wrap"><table class="admin"><thead><tr><th>Name</th><th>Email</th><th>Affiliation</th><th>Role</th><th></th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div>';
+  }
+
+  function adminEventSection(d) {
+    return '<div class="panel" style="margin-bottom:22px"><h3><i class="fa-solid fa-toggle-on"></i>Event settings <span style="font-weight:400;color:var(--text-muted);font-size:14px">— ' + esc(eventName()) + '</span></h3>' +
+      '<label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="regToggle" ' + (d.registrationOpen ? 'checked' : '') + ' data-action="toggle-reg"> Registration open</label></div>' +
+      '<div class="panel"><h3><i class="fa-solid fa-bullhorn"></i>Announcements</h3>' +
+      '<button class="btn btn-outline btn-sm" data-action="new-ann"><i class="fa-solid fa-plus"></i>New announcement</button> ' +
+      '<a class="btn btn-ghost btn-sm" href="#/announcements">Manage on the news page</a></div>';
+  }
+
+  function adminResourcesSection(d) {
+    // The database link is only present when the backend exposes it (dbUrl in
+    // the bootstrap payload, admins only).
+    var links = [];
     if (d.dbUrl) {
-      resourceLinks.push('<a class="admin-link" href="' + esc(d.dbUrl) + '" target="_blank" rel="noopener">' +
+      links.push('<a class="admin-link" href="' + esc(d.dbUrl) + '" target="_blank" rel="noopener">' +
         '<span class="admin-link-icon db"><i class="fa-solid fa-database"></i></span>' +
         '<span class="admin-link-body"><span class="admin-link-title">Main database</span>' +
         '<span class="admin-link-sub">Connected Google Sheet — all tables</span></span>' +
         '<i class="fa-solid fa-arrow-up-right-from-square admin-link-ext"></i></a>');
     }
     if (d.uploadsUrl) {
-      resourceLinks.push('<a class="admin-link" href="' + esc(d.uploadsUrl) + '" target="_blank" rel="noopener">' +
+      links.push('<a class="admin-link" href="' + esc(d.uploadsUrl) + '" target="_blank" rel="noopener">' +
         '<span class="admin-link-icon drive"><i class="fa-brands fa-google-drive"></i></span>' +
         '<span class="admin-link-body"><span class="admin-link-title">Uploads folder</span>' +
         '<span class="admin-link-sub">Google Drive — profile &amp; team images</span></span>' +
         '<i class="fa-solid fa-arrow-up-right-from-square admin-link-ext"></i></a>');
     }
-    var resourcesPanel = '<div class="panel" style="margin-bottom:22px"><h3><i class="fa-solid fa-link"></i>Database &amp; resources</h3>' +
-      (resourceLinks.length
-        ? '<div class="admin-links">' + resourceLinks.join('') + '</div>'
+    return '<div class="panel"><h3><i class="fa-solid fa-link"></i>Database &amp; resources</h3>' +
+      (links.length
+        ? '<div class="admin-links">' + links.join('') + '</div>'
         : '<p style="color:var(--text-muted);margin:0">No linked resources yet.</p>') +
       '</div>';
+  }
 
-    return '<div style="margin-top:8px"></div>' +
-      projectsPanel(d) +
-      resourcesPanel +
-      '<div class="panel" style="margin-bottom:22px"><h3><i class="fa-solid fa-toggle-on"></i>Event settings <span style="font-weight:400;color:var(--text-muted);font-size:14px">— ' + esc(eventName()) + '</span></h3>' +
-      '<label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="regToggle" ' + (d.registrationOpen ? 'checked' : '') + ' data-action="toggle-reg"> Registration open</label></div>' +
-      '<div class="panel" style="margin-bottom:22px"><h3><i class="fa-solid fa-bullhorn"></i>Announcements</h3>' +
-      '<button class="btn btn-outline btn-sm" data-action="new-ann"><i class="fa-solid fa-plus"></i>New announcement</button> ' +
-      '<a class="btn btn-ghost btn-sm" href="#/announcements">Manage on the news page</a></div>' +
-      '<h3 style="margin:26px 0 12px">People (' + users.length + ')</h3>' +
-      '<div class="table-wrap"><table class="admin"><thead><tr><th>Name</th><th>Email</th><th>Affiliation</th><th>Role</th><th></th></tr></thead>' +
-      '<tbody>' + rows + '</tbody></table></div>';
+  // Which admin tab is showing; People is home.
+  var adminTab = 'people';
+
+  function viewAdmin() {
+    var d = state.data;
+    if (!d) return skeletons();
+    if (!d.isAdmin) return '<div class="empty" style="margin-top:40px"><i class="fa-solid fa-shield-halved"></i>Admins only.</div>';
+    var users = (d.users || []);
+    var tabs = [{ id: 'people', label: 'People (' + users.length + ')' }];
+    if (d.registryUrl) tabs.push({ id: 'projects', label: 'Projects' });
+    tabs.push({ id: 'event', label: 'Event' });
+    tabs.push({ id: 'resources', label: 'Resources' });
+    if (!tabs.some(function (t) { return t.id === adminTab; })) adminTab = 'people';
+    var bar = '<div class="admin-tabs">' + tabs.map(function (t) {
+      return '<button class="comm-tab' + (t.id === adminTab ? ' active' : '') + '" type="button" data-action="admin-tab" data-tab="' + t.id + '">' + t.label + '</button>';
+    }).join('') + '</div>';
+    var body =
+      adminTab === 'projects' ? projectsPanel(d) :
+      adminTab === 'event' ? adminEventSection(d) :
+      adminTab === 'resources' ? adminResourcesSection(d) :
+      adminPeopleSection(d);
+    return '<div class="admin-wrap">' + bar + '<div class="admin-tabview">' + body + '</div></div>';
   }
 
   // ---------------------------------------------------------------- router
@@ -2165,6 +2190,7 @@
       case 'add-typed-skill': { var si3 = $('#skillInput'); if (si3) { addTag(si3.value); si3.value = ''; si3.focus(); } break; }
       case 'new-project': projectForm(); break;
       case 'switch-project-btn': switchProject(t.getAttribute('data-proj')); break;
+      case 'admin-tab': adminTab = t.getAttribute('data-tab'); route(); break;
     }
   });
 

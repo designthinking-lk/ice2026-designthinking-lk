@@ -1078,3 +1078,12 @@ body.hive-full .hive .oct { pointer-events: auto; }
 .pc-6 { background: radial-gradient(120% 140% at 0% 0%, rgba(0, 215, 238, 0.35), transparent 55%), linear-gradient(215deg, #232A34, #0F766E); }
 @media (max-width: 1100px) { .projects-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .projects-grid { grid-template-columns: 1fr; } }
+
+/* admin: tabbed, non-scrolling shell — the active section scrolls inside */
+.admin-wrap { height: 100%; display: flex; flex-direction: column; gap: 20px; max-width: 1100px; margin: 0 auto; width: 100%; }
+.admin-tabs {
+  flex: none; align-self: center; display: flex; gap: 4px;
+  background: var(--bg-subtle); border-radius: 999px; padding: 4px; margin-top: 4px;
+}
+.admin-tabs .comm-tab { flex: none; padding: 8px 20px; }
+.admin-tabview { flex: 1; min-height: 0; overflow-y: auto; }
