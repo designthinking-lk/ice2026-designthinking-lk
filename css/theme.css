@@ -46,6 +46,10 @@
 /* Night theme — toggled by the app bar's day/night button (data-theme on <html>,
    persisted in localStorage as ice.theme). Brand accents stay unchanged. */
 :root[data-theme="dark"] {
+  /* At night the purple accent loses contrast — the brand's cyan pops. */
+  --color-accent:       #00D7EE;
+  --color-accent-dark:  #00B7CC;
+  --color-accent-light: #5EE6F5;
   --bg:            #121316;
   --bg-subtle:     #1B1D22;
   --border:        #262930;

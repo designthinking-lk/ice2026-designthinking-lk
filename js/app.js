@@ -454,10 +454,8 @@
     }
     return '<div class="hive-teams" id="hiveTeams">' +
       teams.map(function (t) {
-        var n = (t.members || []).length;
         return '<button class="team-chip' + (t.id === state.teamFilter ? ' on' : '') + (t.demo ? ' demo' : '') + '" type="button" ' +
-          'data-action="filter-team" data-team="' + esc(t.id) + '" data-name="' + esc(t.name) + '">' + esc(t.name) +
-          '<span class="tc-count">' + n + '</span></button>';
+          'data-action="filter-team" data-team="' + esc(t.id) + '" data-name="' + esc(t.name) + '">' + esc(t.name) + '</button>';
       }).join('') + '</div>';
   }
 

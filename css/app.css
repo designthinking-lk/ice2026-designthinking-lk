@@ -96,7 +96,7 @@ button { font-family: inherit; }
 .nav a[hidden] { display: none; }
 /* the spacer's auto margin mirrors ::before's, so the links centre exactly
    regardless of which bottom items (chat/admin) are visible */
-.nav .nav-spacer { margin-top: auto; }
+.nav .nav-spacer { margin-top: auto; height: 52px; }
 .nav a.nav-admin i { color: var(--text-muted); }
 .nav a:hover { background: var(--bg-subtle); color: var(--text); }
 .nav a.active {
@@ -852,8 +852,7 @@ table.admin tr:last-child td { border-bottom: none; }
   box-shadow: 0 4px 14px rgba(97, 0, 255, 0.28);
 }
 .hive-teams .team-chip.on .tc-count { color: rgba(255, 255, 255, 0.85); }
-/* scaffold chips shown before any real team exists — dashed to read as placeholders */
-.hive-teams .team-chip.demo:not(.on) { border-style: dashed; color: var(--text-muted); }
+.hive-teams .team-chip.demo:not(.on) { color: var(--text-muted); }
 
 /* team focus: dim non-members, spotlight this team's octagons (kept after the
    hover-focus rules so an active team filter wins ties over plain focus). */
@@ -1016,3 +1015,15 @@ body.hive-full .hive {
   background: transparent; pointer-events: none;
 }
 body.hive-full .hive .oct { pointer-events: auto; }
+
+/* night mode: cyan accent glow (the purple text-shadows are hardcoded above) */
+:root[data-theme="dark"] .nav a.active { animation-name: nav-glow-dark; }
+:root[data-theme="dark"] .nav a.active i { filter: drop-shadow(0 0 6px rgba(0, 215, 238, 0.5)); }
+@keyframes nav-glow-dark {
+  0%, 100% { transform: scale(1); text-shadow: 0 0 8px rgba(0, 215, 238, 0.35); }
+  50% { transform: scale(1.045); text-shadow: 0 0 16px rgba(0, 215, 238, 0.65); }
+}
+:root[data-theme="dark"] body.chat-open .nav-chat { filter: drop-shadow(0 0 6px rgba(0, 215, 238, 0.5)); }
+/* cyan is a light hue — solid accent buttons need dark text at night */
+:root[data-theme="dark"] .btn-primary,
+:root[data-theme="dark"] .btn-primary:hover { color: #08272B; }
