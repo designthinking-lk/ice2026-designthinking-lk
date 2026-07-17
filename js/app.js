@@ -185,11 +185,11 @@
       navMsg.hidden = true;
       actions.innerHTML = '<button class="btn btn-primary btn-sm" data-action="sign-in"><i class="fa-brands fa-google"></i>Sign in</button>';
     }
-    // chat side pane — available to registered participants (chat needs a
-    // workshop account). Hide the toggle + force-close the pane otherwise.
-    var chatToggle = $('#chatToggle');
+    // chat & broadcasts pane — for registered participants (DMs need a
+    // workshop account). Hide the sidebar button + force-close otherwise.
+    var chatBtn = $('#navChatBtn');
     var showChat = signedIn() && !!d.me;
-    if (chatToggle) chatToggle.hidden = !showChat;
+    if (chatBtn) chatBtn.hidden = !showChat;
     if (!showChat) {
       var pane = $('#chatpane');
       if (pane && !pane.hidden) { pane.hidden = true; document.body.classList.remove('chat-open'); }
@@ -199,6 +199,12 @@
         $('#chatpane').hidden = false;
         document.body.classList.add('chat-open');
       }
+    }
+    // team filter chips live in the app bar, on the People view only
+    var tb = $('#topbarTeams');
+    if (tb) {
+      var chips = /^#\/?$/.test(location.hash || '#/') ? teamChipsHtml() : '';
+      if (tb.innerHTML !== chips) tb.innerHTML = chips;
     }
     // active nav
     var hash = location.hash || '#/';
@@ -302,9 +308,59 @@
     }).join('');
   }
 
+  // Which tab of the comm pane is showing: 'chat' (1:1 DMs via Google Chat)
+  // or 'broadcast' (announcements to everyone).
+  var commTab = 'chat';
+
+  function broadcastList() {
+    var anns = ((state.data && state.data.announcements) || []).slice()
+      .filter(function (a) { return a.isPublished; })
+      .sort(function (a, b) {
+        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+        return a.createdAt < b.createdAt ? 1 : -1;
+      });
+    if (!anns.length) {
+      return '<div class="chatpane-empty"><i class="fa-solid fa-bullhorn"></i>' +
+        '<span>No broadcasts yet.<br>Messages to everyone appear here.</span></div>';
+    }
+    return anns.map(function (a) {
+      var author = userById(a.authorId);
+      return '<div class="bcast">' +
+        '<div class="bcast-head"><span>' + (author ? esc(author.name) : 'Organizers') + '</span>' +
+        '<span class="bcast-when">' + esc(timeAgo(a.createdAt)) + '</span></div>' +
+        '<div class="bcast-title">' + (a.isPinned ? '<i class="fa-solid fa-thumbtack"></i> ' : '') + esc(a.title) + '</div>' +
+        (a.content !== a.title ? '<p class="bcast-body">' + esc(a.content) + '</p>' : '') +
+        '</div>';
+    }).join('');
+  }
+
   function renderChatPane() {
     var body = $('#chatpaneBody');
-    if (body) body.innerHTML = chatPaneList();
+    if (!body) return;
+    $all('.comm-tab').forEach(function (t) {
+      t.classList.toggle('active', t.getAttribute('data-tab') === commTab);
+    });
+    var foot = $('#commFoot');
+    // preserve a broadcast draft across re-renders (refresh() redraws chrome)
+    var draftEl = $('#bcastInput');
+    var draft = draftEl ? draftEl.value : '';
+    if (commTab === 'chat') {
+      body.innerHTML = chatPaneList();
+      if (foot) {
+        foot.innerHTML = '<a class="chatpane-foot-link" href="https://chat.google.com" target="_blank" rel="noopener">' +
+          'Open Google Chat <i class="fa-solid fa-arrow-up-right-from-square"></i></a>';
+      }
+    } else {
+      body.innerHTML = broadcastList();
+      if (foot) {
+        foot.innerHTML = canAnnounce()
+          ? '<div class="bcast-compose"><textarea class="input" id="bcastInput" rows="2" placeholder="Broadcast to everyone…"></textarea>' +
+            '<button class="btn btn-gradient btn-sm" data-action="bcast-send" title="Send to everyone"><span class="label"><i class="fa-regular fa-paper-plane"></i></span><span class="spin"></span></button></div>'
+          : '<div class="bcast-note">Broadcasts come from mentors &amp; organizers.</div>';
+        var bi = $('#bcastInput');
+        if (bi && draft) bi.value = draft;
+      }
+    }
   }
 
   function setChatPane(open) {
@@ -313,8 +369,7 @@
     pane.hidden = !open;
     document.body.classList.toggle('chat-open', open);
     localStorage.setItem(chatKey(), open ? 'open' : 'closed');
-    if (open) { renderChatPane(); fitWordmark(); }
-    else requestAnimationFrame(fitWordmark);
+    if (open) renderChatPane();
   }
 
   // ---------------------------------------------------------------- views
@@ -375,33 +430,45 @@
     return { cells: cells, hollow: { col: sc / n, row: sr / n } };
   }
 
-  function viewHome() {
-    var d = state.data;
-    if (!d) return skeletons();
-    var users = (d.users || []);
-    var mentors = users.filter(function (u) { return u.role === 'mentor'; }).length;
-    var participants = users.length - mentors;
-    // Team filter chips — one per team, sorted by name (Team A, Team B, …).
-    var teams = (d.teams || []).slice().sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
-    // Before any teams exist, show a scaffold of 6 chips (Team A–F) so the
-    // filter is visible and interactive on the empty hive. Real teams replace
-    // the scaffold as soon as they're created.
+  // Team list for the filter chips — one per team, sorted by name; before any
+  // teams exist, a Team A–F scaffold keeps the filter visible and interactive.
+  function homeTeams() {
+    var teams = ((state.data && state.data.teams) || []).slice()
+      .sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
     if (!teams.length) {
       teams = ['A', 'B', 'C', 'D', 'E', 'F'].map(function (l) {
         return { id: 'demo-team-' + l, name: 'Team ' + l, members: [], demo: true };
       });
     }
-    var activeTeam = null;
-    teams.forEach(function (x) { if (x.id === state.teamFilter) activeTeam = x; });
-    if (state.teamFilter && !activeTeam) state.teamFilter = null; // team went away
-    var teamBar = '<div class="hive-teams" id="hiveTeams">' +
+    return teams;
+  }
+
+  // Team filter chips — rendered into the app bar (renderChrome), People view only.
+  function teamChipsHtml() {
+    if (!state.data) return '';
+    var teams = homeTeams();
+    if (state.teamFilter && !teams.some(function (t) { return t.id === state.teamFilter; })) {
+      state.teamFilter = null; // team went away
+    }
+    return '<div class="hive-teams" id="hiveTeams">' +
       teams.map(function (t) {
         var n = (t.members || []).length;
         return '<button class="team-chip' + (t.id === state.teamFilter ? ' on' : '') + (t.demo ? ' demo' : '') + '" type="button" ' +
           'data-action="filter-team" data-team="' + esc(t.id) + '" data-name="' + esc(t.name) + '">' + esc(t.name) +
           '<span class="tc-count">' + n + '</span></button>';
       }).join('') + '</div>';
-    return '<div class="hive">' + teamBar +
+  }
+
+  function viewHome() {
+    var d = state.data;
+    if (!d) return skeletons();
+    var users = (d.users || []);
+    var mentors = users.filter(function (u) { return u.role === 'mentor'; }).length;
+    var participants = users.length - mentors;
+    var activeTeam = null;
+    homeTeams().forEach(function (x) { if (x.id === state.teamFilter) activeTeam = x; });
+    if (state.teamFilter && !activeTeam) state.teamFilter = null;
+    return '<div class="hive">' +
       '<div class="hive-legend">' +
       '<span><span class="dot mentor"></span>' + mentors + ' mentor' + (mentors === 1 ? '' : 's') + '</span>' +
       '<span><span class="dot participant"></span>' + participants + ' participant' + (participants === 1 ? '' : 's') + '</span>' +
@@ -457,14 +524,16 @@
       var el;
       if (u) {
         var mentor = u.role === 'mentor';
+        var online = ((state.data && state.data.online) || []).indexOf(u.id) !== -1;
         el = document.createElement('a');
         el.className = 'oct ' + (mentor ? 'm' : 'p');
         el.href = '#/profile/' + u.id;
-        el.title = u.name;
+        el.title = u.name + (online ? ' — online' : '');
         el.setAttribute('data-uid', u.id);
         el.innerHTML = '<div class="oct-in">' +
           (u.image ? '<img src="' + esc(u.image) + '" alt="" loading="lazy">' : '<span class="oct-blank">' + esc(initials(u.name)) + '</span>') +
-          '</div>';
+          '</div>' +
+          (online ? '<span class="oct-online" title="Online"></span>' : '');
         el.addEventListener('mouseenter', function () { showHivePreview(u, mentor, el); });
         el.addEventListener('mouseleave', hideHivePreview);
       } else {
@@ -1936,6 +2005,24 @@
         break;
       }
       case 'toggle-chat': { var cp = $('#chatpane'); if (cp) setChatPane(cp.hidden); break; }
+      case 'comm-tab': commTab = t.getAttribute('data-tab') === 'broadcast' ? 'broadcast' : 'chat'; renderChatPane(); break;
+      case 'bcast-send': {
+        var bi = $('#bcastInput');
+        var msg = bi ? bi.value.trim() : '';
+        if (!msg) break;
+        busy(t, true);
+        try {
+          // announcements need a title — the first line doubles as one
+          var firstLine = msg.split('\n')[0].slice(0, 80);
+          await A.api('ann_create', { title: firstLine, content: msg, type: 'general', isPublished: true });
+          if (bi) bi.value = '';
+          await refresh();
+          toast('Broadcast sent to everyone');
+        } catch (err) { toast(err.message, true); }
+        busy(t, false);
+        renderChatPane();
+        break;
+      }
       case 'toggle-theme': {
         var dark = !isDark();
         try { localStorage.setItem('ice.theme', dark ? 'dark' : 'light'); } catch (err) { /* private mode */ }
@@ -2251,5 +2338,10 @@
         location.hash = '#/register';
       }
     });
+    // Keep presence dots + broadcasts fresh (and mark ourselves online)
+    // while the tab is visible. 2 min < the backend's 5-min online window.
+    setInterval(function () {
+      if (document.visibilityState === 'visible' && signedIn()) refresh();
+    }, 120000);
   })();
 })();

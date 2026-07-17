@@ -42,19 +42,21 @@
         <a href="#/teams" data-nav="teams" title="Teams"><i class="fa-solid fa-people-group"></i><span>Teams</span></a>
         <a href="#/projects" data-nav="projects" id="navProjects" title="Projects" hidden><i class="fa-solid fa-diagram-project"></i><span>Projects</span></a>
         <a href="#/tools" data-nav="tools" id="navTools" title="Tools" hidden><i class="fa-solid fa-toolbox"></i><span>Tools</span></a>
-        <a href="#/announcements" data-nav="announcements" title="News"><i class="fa-solid fa-bullhorn"></i><span>News</span></a>
         <a href="https://chat.google.com" target="_blank" rel="noopener" id="navMessages" title="Messages" hidden>
           <i class="fa-solid fa-message"></i><span>Messages</span><i class="fa-solid fa-arrow-up-right-from-square ext"></i>
         </a>
+        <!-- chat & broadcasts — icon only, pinned to the bottom (news lives in its Broadcast tab) -->
+        <button type="button" class="nav-chat" id="navChatBtn" data-action="toggle-chat" title="Chat &amp; broadcasts" hidden>
+          <i class="fa-regular fa-comments"></i>
+        </button>
         <a href="#/admin" data-nav="admin" id="navAdmin" class="nav-admin" title="Admin" hidden><i class="fa-solid fa-gear"></i><span>Admin</span></a>
       </nav>
     </aside>
 
     <div class="main">
       <header class="topbar">
-        <button class="chat-toggle" id="chatToggle" type="button" data-action="toggle-chat" aria-label="Workshop chat" title="Workshop chat" hidden>
-          <i class="fa-regular fa-comments"></i>
-        </button>
+        <!-- team filter chips (People view only) — filled by app.js -->
+        <div class="topbar-teams" id="topbarTeams"></div>
         <button class="theme-toggle" id="themeToggle" type="button" data-action="toggle-theme" aria-label="Toggle night mode" title="Night mode">
           <i class="fa-solid fa-moon"></i>
         </button>
@@ -66,13 +68,16 @@
       <main id="view" class="view"></main>
     </div>
 
-    <aside class="chatpane" id="chatpane" hidden aria-label="Workshop chat">
-      <div class="chatpane-head">
-        <h3><i class="fa-regular fa-comments"></i> Workshop chat</h3>
-        <button class="chatpane-close" type="button" data-action="toggle-chat" aria-label="Close chat"><i class="fa-solid fa-xmark"></i></button>
+    <aside class="commpane" id="chatpane" hidden aria-label="Chat and broadcasts">
+      <div class="commpane-head">
+        <div class="comm-tabs" role="tablist">
+          <button class="comm-tab active" type="button" data-action="comm-tab" data-tab="chat" id="commTabChat">Chat</button>
+          <button class="comm-tab" type="button" data-action="comm-tab" data-tab="broadcast" id="commTabBroadcast">Broadcast</button>
+        </div>
+        <button class="chatpane-close" type="button" data-action="toggle-chat" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="chatpane-body" id="chatpaneBody"></div>
-      <a class="chatpane-foot" href="https://chat.google.com" target="_blank" rel="noopener">Open Google Chat <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+      <div class="commpane-foot" id="commFoot"></div>
     </aside>
   </div>
 
