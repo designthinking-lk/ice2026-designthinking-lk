@@ -1881,29 +1881,205 @@
     return '<div class="empty" style="margin-top:40px"><i class="fa-solid fa-toolbox"></i>Tools are coming soon.<br>Handy links and resources for the workshop will live here.</div>';
   }
 
-  // Skills across the whole room — tapping one jumps to People filtered by it.
+  // Skills across the whole room — a 3D constellation: skills are nodes
+  // (sized by how many people bring them), lines join skills that live in the
+  // same person. Drag orbits like a 3D viewport; click a node to meet its
+  // people. Sparse rooms are padded with dim "ghost" nodes from the
+  // suggestion catalog so the maze reads well from day one.
   function viewSkills() {
     var d = state.data;
     if (!d) return skeletons();
-    var counts = {};
-    (d.users || []).forEach(function (u) {
-      (u.skills || []).forEach(function (s) { counts[s] = (counts[s] || 0) + 1; });
+    return '<div class="skills3d-wrap">' +
+      '<canvas id="skillsCanvas"></canvas>' +
+      '<div class="skills3d-head"><h2>Skills in the room</h2>' +
+      '<p>Drag to orbit &middot; scroll to zoom &middot; click a skill to meet its people</p></div>' +
+      '</div>';
+  }
+
+  function initSkillsGraph(canvas) {
+    var users = (state.data && state.data.users) || [];
+    var counts = {}, pairW = {};
+    users.forEach(function (u) {
+      var sk = u.skills || [];
+      sk.forEach(function (s) { counts[s] = (counts[s] || 0) + 1; });
+      for (var a = 0; a < sk.length; a++) for (var b = a + 1; b < sk.length; b++) {
+        var key = sk[a] < sk[b] ? sk[a] + ' ' + sk[b] : sk[b] + ' ' + sk[a];
+        pairW[key] = (pairW[key] || 0) + 1;
+      }
     });
-    var names = Object.keys(counts).sort(function (a, b) {
-      return counts[b] - counts[a] || a.localeCompare(b);
+    var names = Object.keys(counts);
+    // pad sparse rooms with ghost nodes from the suggestion catalog
+    (C.SKILL_SUGGESTIONS || []).forEach(function (s) {
+      if (names.length < 20 && !(s in counts)) { counts[s] = 0; names.push(s); }
     });
-    if (!names.length) {
-      return '<div class="empty" style="margin-top:40px"><i class="fa-solid fa-wand-magic-sparkles"></i>' +
-        'No skills yet — they light up here as people register.</div>';
+    var idx = {};
+    var nodes = names.map(function (s, i) {
+      idx[s] = i;
+      // fibonacci sphere start positions
+      var t = i / Math.max(1, names.length - 1);
+      var phi = Math.acos(1 - 2 * t), theta = Math.PI * (1 + Math.sqrt(5)) * i;
+      return {
+        name: s, count: counts[s],
+        x: Math.sin(phi) * Math.cos(theta), y: 1 - 2 * t, z: Math.sin(phi) * Math.sin(theta),
+      };
+    });
+    var edges = Object.keys(pairW).map(function (k) {
+      var p = k.split(' ');
+      return { a: idx[p[0]], b: idx[p[1]], w: pairW[k], real: true };
+    });
+    // decorative lattice: each ghost node links to its 2 nearest neighbours
+    nodes.forEach(function (n, i) {
+      if (n.count > 0) return;
+      var near = nodes.map(function (m, j) {
+        if (i === j) return null;
+        var dx = n.x - m.x, dy = n.y - m.y, dz = n.z - m.z;
+        return { j: j, d: dx * dx + dy * dy + dz * dz };
+      }).filter(Boolean).sort(function (a, b) { return a.d - b.d; }).slice(0, 2);
+      near.forEach(function (m) { edges.push({ a: i, b: m.j, w: 1, real: false }); });
+    });
+    // a few force passes: real co-occurrence pulls together, crowding pushes apart
+    for (var it = 0; it < 90; it++) {
+      edges.forEach(function (e) {
+        if (!e.real) return;
+        var A = nodes[e.a], B = nodes[e.b];
+        var k = 0.004 * Math.min(e.w, 4);
+        A.x += (B.x - A.x) * k; A.y += (B.y - A.y) * k; A.z += (B.z - A.z) * k;
+        B.x += (A.x - B.x) * k; B.y += (A.y - B.y) * k; B.z += (A.z - B.z) * k;
+      });
+      for (var i2 = 0; i2 < nodes.length; i2++) for (var j2 = i2 + 1; j2 < nodes.length; j2++) {
+        var P = nodes[i2], Q = nodes[j2];
+        var dx = Q.x - P.x, dy = Q.y - P.y, dz = Q.z - P.z;
+        var d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 < 0.35 && d2 > 1e-6) {
+          var push = 0.012 * (0.35 - d2) / Math.sqrt(d2);
+          P.x -= dx * push; P.y -= dy * push; P.z -= dz * push;
+          Q.x += dx * push; Q.y += dy * push; Q.z += dz * push;
+        }
+      }
+      nodes.forEach(function (n) { // keep everyone near the unit shell
+        var r = Math.sqrt(n.x * n.x + n.y * n.y + n.z * n.z) || 1;
+        var target = 1 + (r - 1) * 0.6;
+        n.x *= target / r; n.y *= target / r; n.z *= target / r;
+      });
     }
-    return '<div class="skills-wrap">' +
-      '<h2>Skills in the room</h2>' +
-      '<p class="skills-sub">Everything this year’s people bring with them — tap a skill to meet them.</p>' +
-      '<div class="skills-cloud">' +
-      names.map(function (s) {
-        return '<button class="skill-cloud-chip" type="button" data-action="filter-skill" data-skill="' + esc(s) + '">' +
-          esc(s) + '<span class="sk-count">' + counts[s] + '</span></button>';
-      }).join('') + '</div></div>';
+
+    var ctx = canvas.getContext('2d');
+    var yaw = 0.6, pitch = 0.25, vyaw = 0, vpitch = 0, zoom = 1;
+    var dragging = false, moved = 0, lastX = 0, lastY = 0, mx = -1, my = -1, hover = -1;
+    var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var theme = {}, themeTick = 0;
+    function readTheme() {
+      var cs = getComputedStyle(document.documentElement);
+      theme = {
+        accent: cs.getPropertyValue('--color-accent').trim() || '#6100FF',
+        text: cs.getPropertyValue('--text').trim() || '#0E0F11',
+        faint: cs.getPropertyValue('--text-faint').trim() || '#AAAFB6',
+        line: cs.getPropertyValue('--border-strong').trim() || '#C9D8E3',
+      };
+    }
+    readTheme();
+
+    canvas.addEventListener('pointerdown', function (e) {
+      dragging = true; moved = 0; lastX = e.clientX; lastY = e.clientY;
+      canvas.setPointerCapture(e.pointerId);
+    });
+    canvas.addEventListener('pointermove', function (e) {
+      var r = canvas.getBoundingClientRect();
+      mx = e.clientX - r.left; my = e.clientY - r.top;
+      if (!dragging) return;
+      var dX = e.clientX - lastX, dY = e.clientY - lastY;
+      moved += Math.abs(dX) + Math.abs(dY);
+      vyaw = dX * 0.005; vpitch = dY * 0.005;
+      yaw += vyaw; pitch = Math.max(-1.4, Math.min(1.4, pitch + vpitch));
+      lastX = e.clientX; lastY = e.clientY;
+    });
+    canvas.addEventListener('pointerup', function () {
+      dragging = false;
+      if (moved < 6 && hover !== -1 && nodes[hover].count > 0) {
+        state.skillFilter = nodes[hover].name;
+        location.hash = '#/people';
+      }
+    });
+    canvas.addEventListener('pointerleave', function () { mx = my = -1; });
+    canvas.addEventListener('wheel', function (e) {
+      e.preventDefault();
+      zoom = Math.max(0.5, Math.min(2.2, zoom * (e.deltaY > 0 ? 0.94 : 1.06)));
+    }, { passive: false });
+
+    var proj = new Array(nodes.length);
+    function frame() {
+      if (!canvas.isConnected) return; // view changed — stop the loop
+      if (++themeTick % 40 === 0) readTheme();
+      var wrap = canvas.parentElement;
+      var W = wrap.clientWidth, H = wrap.clientHeight, dpr = window.devicePixelRatio || 1;
+      if (canvas.width !== W * dpr || canvas.height !== H * dpr) {
+        canvas.width = W * dpr; canvas.height = H * dpr;
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+
+      if (!dragging) {
+        yaw += reduceMotion ? 0 : 0.0018 + vyaw; pitch += vpitch;
+        vyaw *= 0.95; vpitch *= 0.95;
+        pitch = Math.max(-1.4, Math.min(1.4, pitch));
+      }
+      var cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+      var scale = Math.min(W, H) * 0.34 * zoom, camd = 3.2;
+      for (var i = 0; i < nodes.length; i++) {
+        var n = nodes[i];
+        var x1 = n.x * cy + n.z * sy, z1 = -n.x * sy + n.z * cy;
+        var y2 = n.y * cp - z1 * sp, z2 = n.y * sp + z1 * cp;
+        var f = camd / (camd - z2);
+        proj[i] = { x: W / 2 + x1 * scale * f, y: H / 2 + y2 * scale * f, f: f, z: z2 };
+      }
+      // hover pick (nearest projected node)
+      hover = -1;
+      if (mx >= 0) {
+        var best = 1e9;
+        for (var h = 0; h < nodes.length; h++) {
+          var pr = (nodes[h].count > 0 ? 7 + Math.sqrt(nodes[h].count) * 5 : 5) * proj[h].f + 6;
+          var ddx = proj[h].x - mx, ddy = proj[h].y - my, dd = ddx * ddx + ddy * ddy;
+          if (dd < pr * pr && dd < best) { best = dd; hover = h; }
+        }
+      }
+      canvas.style.cursor = dragging ? 'grabbing' : (hover !== -1 && nodes[hover].count > 0 ? 'pointer' : 'grab');
+
+      edges.forEach(function (e) {
+        var A = proj[e.a], B = proj[e.b];
+        var depth = Math.max(0.08, ((A.f + B.f) / 2 - 0.7) * 1.1);
+        var hot = hover !== -1 && (e.a === hover || e.b === hover);
+        ctx.strokeStyle = e.real ? theme.accent : theme.line;
+        ctx.globalAlpha = Math.min(1, depth * (e.real ? 0.24 + 0.12 * Math.min(e.w, 3) : 0.16) * (hot ? 2.6 : 1));
+        ctx.lineWidth = e.real ? Math.min(2.5, 0.8 + e.w * 0.5) : 0.8;
+        ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+      });
+      // nodes back-to-front
+      var order = nodes.map(function (_, i) { return i; }).sort(function (a, b) { return proj[a].z - proj[b].z; });
+      order.forEach(function (i3) {
+        var n = nodes[i3], p = proj[i3];
+        var real = n.count > 0;
+        var r = (real ? 7 + Math.sqrt(n.count) * 5 : 4.5) * p.f;
+        var depth = Math.max(0.15, (p.f - 0.7) * 1.4);
+        ctx.globalAlpha = Math.min(1, depth + (hover === i3 ? 0.4 : 0));
+        ctx.fillStyle = real ? theme.accent : theme.faint;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+        if (hover === i3) {
+          ctx.strokeStyle = theme.accent; ctx.lineWidth = 2; ctx.globalAlpha = 0.9;
+          ctx.beginPath(); ctx.arc(p.x, p.y, r + 4, 0, Math.PI * 2); ctx.stroke();
+        }
+        var showLabel = real || p.f > 1 || hover === i3;
+        if (showLabel) {
+          ctx.globalAlpha = Math.min(1, depth * (real ? 1 : 0.65) + (hover === i3 ? 0.4 : 0));
+          ctx.fillStyle = real ? theme.text : theme.faint;
+          ctx.font = (hover === i3 ? '700 ' : '600 ') + Math.round((real ? 12.5 : 11) * p.f) + 'px "neue-haas-grotesk-text","Helvetica Neue",sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(n.name + (real ? ' · ' + n.count : ''), p.x, p.y + r + 14 * p.f);
+        }
+      });
+      ctx.globalAlpha = 1;
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
   }
 
   // Full registry rows, lazily fetched for the admin Projects panel (global
@@ -2071,6 +2247,9 @@
   function wireViewExtras(hash, m) {
     // people wordmark: build tiles from live data, then scale to fit
     if ($('#word')) requestAnimationFrame(buildWordmark);
+    // skills constellation
+    var sc = $('#skillsCanvas');
+    if (sc) initSkillsGraph(sc);
     // skill tag input
     var skillInput = $('#skillInput');
     if (skillInput) {

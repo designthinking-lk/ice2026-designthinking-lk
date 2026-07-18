@@ -1227,23 +1227,12 @@ body.hive-full .project-switcher select { pointer-events: auto; }
    its letter's position are unchanged */
 .tc-ghost { visibility: hidden; }
 
-/* ------------------------------------------------------------------ skills */
-.skills-wrap { max-width: 860px; margin: 26px auto 0; }
-.skills-wrap h2 { font-family: var(--font-display); font-size: 24px; letter-spacing: -0.01em; margin: 0 0 6px; }
-.skills-sub { color: var(--text-muted); font-size: 14px; margin: 0 0 24px; }
-.skills-cloud { display: flex; flex-wrap: wrap; gap: 10px; }
-.skill-cloud-chip {
-  display: inline-flex; align-items: center; gap: 8px;
-  border: 1px solid var(--border-strong); background: var(--surface);
-  border-radius: 999px; padding: 8px 16px; cursor: pointer;
-  font: inherit; font-size: 14.5px; font-weight: 600; color: var(--text);
-  transition: border-color 0.15s, color 0.15s;
-}
-.skill-cloud-chip:hover { border-color: var(--color-accent); color: var(--color-accent); }
-.skill-cloud-chip .sk-count {
-  background: var(--bg-subtle); color: var(--text-muted); border-radius: 999px;
-  font-size: 12px; font-weight: 700; padding: 2px 8px;
-}
+/* --------------------------------------------------- skills constellation */
+.skills3d-wrap { position: absolute; inset: 0; overflow: hidden; }
+.skills3d-wrap canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+.skills3d-head { position: absolute; top: 8px; left: 32px; pointer-events: none; }
+.skills3d-head h2 { font-family: var(--font-display); font-size: 24px; letter-spacing: -0.01em; margin: 0 0 4px; }
+.skills3d-head p { color: var(--text-muted); font-size: 13px; margin: 0; }
 
 /* ------------------------------------------------- landing chrome overlay */
 /* On the landing the video IS the background: sidebar + topbar go clear and
