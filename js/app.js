@@ -273,7 +273,7 @@
     document.body.classList.toggle('landing-bg', /^#\/?$/.test(location.hash || '#/'));
     // active nav
     var hash = location.hash || '#/';
-    $all('#nav a').forEach(function (a) {
+    $all('#nav a, .fab-stack a').forEach(function (a) {
       var key = a.getAttribute('data-nav');
       var on = (key === 'people' && hash.indexOf('#/profile') === 0) ||
                hash.indexOf('#/' + key) === 0 ||
@@ -622,6 +622,12 @@
           (online ? '<span class="oct-online" title="Online"></span>' : '');
         el.addEventListener('mouseenter', function () { showHivePreview(u, mentor, el); });
         el.addEventListener('mouseleave', hideHivePreview);
+        // click: pin the preview for 10 s, then a quick fade-out. (The big
+        // preview octagon itself opens the profile.)
+        el.addEventListener('click', function (e) {
+          e.preventDefault();
+          holdHivePreview(u, mentor, el);
+        });
       } else {
         el = document.createElement('div');
         el.className = 'oct empty';
@@ -649,6 +655,13 @@
       '<span class="oct-pvname"><span id="hivePvNm"></span><span class="oct-pvrole" id="hivePvRole"></span></span></div>';
     word.appendChild(preview);
     word.__preview = preview;
+    // hollow centre in natural coords — fitWordmark re-sizes the preview from it
+    word.__hollowX = (built.hollow.col + 0.5) * w - minX;
+    word.__hollowY = (built.hollow.row + 0.5) * w - minY;
+    // the filled preview links to the shown person's profile
+    preview.addEventListener('click', function () {
+      if (preview.classList.contains('on') && word.__pvUid) location.hash = '#/profile/' + word.__pvUid;
+    });
 
     fitWordmark();
     applyTeamFilter(); // re-assert an active team highlight after any rebuild
@@ -673,6 +686,7 @@
   function showHivePreview(u, mentor, el) {
     var word = $('#word'); if (!word) return;
     word.classList.add('focus');
+    word.__pvUid = u.id;
     if (word.__active) word.__active.classList.remove('active');
     el.classList.add('active'); word.__active = el;
     var img = $('#hivePvImg'), nm = $('#hivePvNm'), role = $('#hivePvRole');
@@ -680,11 +694,30 @@
     if (nm) nm.textContent = u.name;
     if (role) role.textContent = mentor ? 'Mentor' : 'Participant';
     var p = word.__preview;
-    if (p) { p.classList.remove('m', 'p'); p.classList.add(mentor ? 'm' : 'p', 'on'); }
+    if (p) { p.classList.remove('m', 'p', 'fadeout'); p.classList.add(mentor ? 'm' : 'p', 'on'); }
+  }
+  // Click-pin: the preview survives mouseleave for 10 s, then fades out fast.
+  var hiveHold = { timer: null, until: 0 };
+  function holdHivePreview(u, mentor, el) {
+    showHivePreview(u, mentor, el);
+    clearTimeout(hiveHold.timer);
+    hiveHold.until = Date.now() + 10000;
+    hiveHold.timer = setTimeout(function () {
+      hiveHold.until = 0;
+      var word = $('#word');
+      if (word && word.__preview) word.__preview.classList.add('fadeout');
+      setTimeout(function () {
+        var w2 = $('#word');
+        if (w2 && w2.__preview) w2.__preview.classList.remove('fadeout');
+        hideHivePreview();
+      }, 240);
+    }, 10000);
   }
   function hideHivePreview() {
+    if (hiveHold.until > Date.now()) return; // pinned by a click — stays up
     var word = $('#word'); if (!word) return;
     word.classList.remove('focus');
+    word.__pvUid = null;
     if (word.__active) { word.__active.classList.remove('active'); word.__active = null; }
     if (word.__preview) word.__preview.classList.remove('on');
   }
@@ -703,6 +736,15 @@
     word.style.transform = 'scale(' + s + ')';
     word.style.width = (ww * s) + 'px';
     word.style.height = (wh * s) + 'px';
+    // preview octagon renders at exactly 280px — the same size as the nav's
+    // half octagon (.side-oct) — by compensating for the wordmark scale
+    if (word.__preview && word.__hollowX !== undefined) {
+      var pv = 280 / s;
+      word.__preview.style.width = pv + 'px';
+      word.__preview.style.height = pv + 'px';
+      word.__preview.style.left = (word.__hollowX - pv / 2) + 'px';
+      word.__preview.style.top = (word.__hollowY - pv / 2) + 'px';
+    }
   }
 
   function skeletons() {

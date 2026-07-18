@@ -887,6 +887,9 @@ table.admin tr:last-child td { border-bottom: none; }
 .oct-preview.on { filter: drop-shadow(0 14px 34px rgba(0, 0, 0, 0.6)); }
 .oct-preview .oct-pin { opacity: 0; transition: opacity 0.3s ease, transform 0.3s ease; transform: scale(0.94); }
 .oct-preview.on .oct-pin { opacity: 1; transform: scale(1); }
+.oct-preview.on { cursor: pointer; }
+/* click-hold expiring: quick fade-out of the pinned photo */
+.oct-preview.fadeout .oct-pin { opacity: 0; transform: scale(0.96); transition: opacity 0.22s ease, transform 0.22s ease; }
 .oct-pin { width: 100%; height: 100%; position: relative; z-index: 1; overflow: hidden; background: #111; clip-path: var(--oct); }
 .oct-pin img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .oct-pvname {
@@ -1009,8 +1012,21 @@ body.chat-open .chat-toggle { background: var(--color-accent-light); border-colo
 
 /* ------------------------------------------------- chat & broadcasts pane */
 /* Floating chat button, bottom-right corner (news lives in its Broadcast tab) */
-.chat-fab {
+.fab-stack {
   position: fixed; right: 22px; bottom: 22px; z-index: 55;
+  display: flex; align-items: center; gap: 10px;
+}
+.tools-fab {
+  width: 38px; height: 38px; border-radius: 999px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-body); font-size: 15px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.tools-fab:hover { background: var(--bg-subtle); border-color: var(--border-strong); color: var(--text); }
+.tools-fab[hidden] { display: none; }
+.tools-fab.active { color: var(--color-accent); border-color: var(--color-accent); }
+.chat-fab {
   /* same footprint as the theme toggle / profile buttons */
   width: 38px; height: 38px; border-radius: 999px; border: none; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
@@ -1087,6 +1103,12 @@ body.hive-full .hive {
   background: transparent; pointer-events: none;
 }
 body.hive-full .hive .oct { pointer-events: auto; }
+/* the nav/switcher boxes (z-index 1) span the rail and would swallow hover on
+   the hive tiles beneath — pass the pointer through except on the controls */
+body.hive-full .nav { pointer-events: none; }
+body.hive-full .nav a { pointer-events: auto; }
+body.hive-full .project-switcher { pointer-events: none; }
+body.hive-full .project-switcher select { pointer-events: auto; }
 
 /* night mode: cyan accent glow (the purple text-shadows are hardcoded above) */
 :root[data-theme="dark"] .nav a.active { animation-name: nav-glow-dark; }
