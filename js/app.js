@@ -202,7 +202,7 @@
     var isHome = /^#\/?$/.test(location.hash || '#/');
     var tb = $('#topbarTeams');
     if (tb) {
-      var chips = isHome ? teamChipsHtml() : '';
+      var chips = isHome ? teamChipsHtml() + topbarLegendHtml() : '';
       if (tb.innerHTML !== chips) tb.innerHTML = chips;
     }
     // on People, the hive goes full-bleed over the rail (letters above the
@@ -452,29 +452,38 @@
     if (state.teamFilter && !teams.some(function (t) { return t.id === state.teamFilter; })) {
       state.teamFilter = null; // team went away
     }
+    // chain stack: later chips tuck under earlier ones (descending z-index),
+    // leaving just their tail letter visible — hover/selection lifts a chip out
     return '<div class="hive-teams" id="hiveTeams">' +
-      teams.map(function (t) {
+      teams.map(function (t, i) {
         return '<button class="team-chip' + (t.id === state.teamFilter ? ' on' : '') + (t.demo ? ' demo' : '') + '" type="button" ' +
+          'style="z-index:' + (teams.length - i) + '" ' +
           'data-action="filter-team" data-team="' + esc(t.id) + '" data-name="' + esc(t.name) + '">' + esc(t.name) + '</button>';
       }).join('') + '</div>';
+  }
+
+  // mentors/participants counts — shown beside the team chain in the app bar
+  function topbarLegendHtml() {
+    var users = (state.data && state.data.users) || [];
+    var mentors = users.filter(function (u) { return u.role === 'mentor'; }).length;
+    var participants = users.length - mentors;
+    return '<div class="topbar-legend">' +
+      '<span><span class="dot mentor"></span>' + mentors + ' mentor' + (mentors === 1 ? '' : 's') + '</span>' +
+      '<span><span class="dot participant"></span>' + participants + ' participant' + (participants === 1 ? '' : 's') + '</span>' +
+      '</div>';
   }
 
   function viewHome() {
     var d = state.data;
     if (!d) return skeletons();
-    var users = (d.users || []);
-    var mentors = users.filter(function (u) { return u.role === 'mentor'; }).length;
-    var participants = users.length - mentors;
     var activeTeam = null;
     homeTeams().forEach(function (x) { if (x.id === state.teamFilter) activeTeam = x; });
     if (state.teamFilter && !activeTeam) state.teamFilter = null;
+    // legend lives in the app bar beside the team chain; caption inside the
+    // preview octagon (buildWordmark)
     return '<div class="hive">' +
-      '<div class="hive-legend">' +
-      '<span><span class="dot mentor"></span>' + mentors + ' mentor' + (mentors === 1 ? '' : 's') + '</span>' +
-      '<span><span class="dot participant"></span>' + participants + ' participant' + (participants === 1 ? '' : 's') + '</span>' +
-      '</div>' +
       '<div class="hive-stage" id="hiveStage"><div class="word" id="word"></div></div>' +
-      '</div>'; // caption lives inside the preview octagon (buildWordmark)
+      '</div>';
   }
 
   function hiveCaptionText(users, team) {

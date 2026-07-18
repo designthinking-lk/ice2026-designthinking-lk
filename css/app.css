@@ -1111,3 +1111,21 @@ body.hive-full .hive .oct { pointer-events: auto; }
 .date-range { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
 .date-range label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-muted); }
 .date-range input[type="date"] { width: 170px; }
+
+/* team chips as a chain: each chip tucks under the previous, only its tail
+   letter peeking out — (Team A) B) C) D)… Hover or selection lifts one out. */
+.topbar-teams { align-items: center; overflow: visible; }
+.topbar-teams .hive-teams { gap: 0; }
+.topbar-teams .team-chip { position: relative; transition: transform 0.15s ease; }
+.topbar-teams .team-chip + .team-chip { margin-left: -52px; }
+.topbar-teams .team-chip:hover { z-index: 60 !important; transform: translateY(-1px); }
+.topbar-teams .team-chip.on { z-index: 55 !important; }
+
+/* mentors/participants legend beside the chain, same line */
+.topbar-legend {
+  display: flex; align-items: center; gap: 16px; margin-left: 20px;
+  font-size: 13px; color: var(--text-muted); white-space: nowrap; flex: none;
+}
+.topbar-legend .dot { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
+.topbar-legend .dot.mentor { background: #6100FF; }
+.topbar-legend .dot.participant { background: #00D7EE; }
