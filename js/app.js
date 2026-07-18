@@ -2067,8 +2067,8 @@
           ctx.strokeStyle = theme.accent; ctx.lineWidth = 2; ctx.globalAlpha = 0.9;
           ctx.beginPath(); ctx.arc(p.x, p.y, r + 4, 0, Math.PI * 2); ctx.stroke();
         }
-        // multi-person skills carry their count inside the node
-        if (real && n.count > 1) {
+        // real skills carry their tag count inside the node
+        if (real) {
           ctx.globalAlpha = Math.min(1, depth + 0.25);
           ctx.fillStyle = '#fff';
           ctx.font = '700 ' + Math.round(Math.max(10, Math.min(r * 0.85, 18))) + 'px "neue-haas-grotesk-text","Helvetica Neue",sans-serif';

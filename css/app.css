@@ -1016,15 +1016,17 @@ body.chat-open .chat-toggle { background: var(--color-accent-light); border-colo
   position: fixed; right: 22px; bottom: 22px; z-index: 55;
   display: flex; align-items: center; gap: 10px;
 }
+/* styled like the sidebar nav links (People / Projects / Skills) */
 .tools-fab {
-  height: 38px; border-radius: 999px; flex: none;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  padding: 0 16px;
-  border: 1px solid var(--border); background: var(--surface);
-  color: var(--text-body); font-size: 14.5px; font-weight: 600;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  display: flex; align-items: center; gap: 11px; flex: none;
+  padding: 10px 14px; border-radius: 10px;
+  color: var(--text-body); font-weight: 500; font-size: 16px;
+  transition: background 0.15s, color 0.15s;
 }
-.tools-fab i { font-size: 14px; }
+.tools-fab i { font-size: 15.5px; width: 20px; text-align: center; color: var(--text-faint); }
+.tools-fab:hover { background: var(--bg-subtle); color: var(--text); }
+.tools-fab.active { color: var(--color-accent); }
+.tools-fab.active i { color: var(--color-accent); }
 .tools-fab:hover { background: var(--bg-subtle); border-color: var(--border-strong); color: var(--text); }
 .tools-fab[hidden] { display: none; }
 .tools-fab.active { color: var(--color-accent); border-color: var(--color-accent); }
