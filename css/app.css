@@ -33,7 +33,7 @@ button { font-family: inherit; }
 .topbar-actions { display: flex; align-items: center; gap: 10px; }
 
 /* Avatar dropdown menu (anchored under the profile button; not a modal) */
-.topbar { position: relative; z-index: 2; /* above the landing video layer */ }
+.topbar { position: relative; }
 .menu-pop {
   position: absolute; top: calc(100% - 4px); right: 16px; z-index: 70;
   min-width: 210px; padding: 6px; background: var(--surface);
@@ -59,9 +59,6 @@ button { font-family: inherit; }
   padding: 18px 16px 20px;
   background: var(--surface);
   position: relative; overflow: hidden; /* clips the octagon's off-screen half */
-  /* above the landing video AND the topbar (z2): the fixed animated brand
-     lives in this stacking context and must expand across the topbar */
-  z-index: 3;
 }
 
 /* Half of a large hive octagon, vertically centred, its other half bleeding
@@ -207,7 +204,7 @@ button { font-family: inherit; }
    (full-screen experiment; the previous centered 860px card is in git
    history @v25) and fades in after a beat. Wide alpha fades (~2in) melt
    every edge into the page; chrome layers above via z-index. */
-.landing { position: fixed; inset: 0 0 0 176px; z-index: 0; /* left offset: the fade starts at the sidebar's edge instead of vanishing behind it */ }
+.landing { position: fixed; inset: 0; z-index: 0; /* full viewport — the chrome goes transparent above it (body.landing-bg rules) */ }
 .feature-video {
   position: absolute; inset: 0;
   opacity: 0; transform: scale(1.03);
@@ -1189,3 +1186,19 @@ body.hive-full .hive .oct { pointer-events: auto; }
 /* hidden "Team " prefix on tucked chips — keeps width, so the chip's size and
    its letter's position are unchanged */
 .tc-ghost { visibility: hidden; }
+
+/* ------------------------------------------------- landing chrome overlay */
+/* On the landing the video IS the background: sidebar + topbar go clear and
+   their content floats above; the nav's octagon turns glassy for legibility.
+   (Kept last so it outranks the night-mode surface rules above.) */
+body.landing-bg .sidebar, body.landing-bg .topbar { background: transparent; }
+/* landing-only layering: video (z0) < topbar (z2) < sidebar (z3, so the fixed
+   animated brand in its stacking context rides above the topbar). Scoped here
+   because a global sidebar z-index would cover the People hive's rail tiles. */
+body.landing-bg .topbar { z-index: 2; }
+body.landing-bg .sidebar { z-index: 3; }
+body.landing-bg .side-oct {
+  background: rgba(244, 247, 249, 0.72);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+:root[data-theme="dark"] body.landing-bg .side-oct { background: rgba(27, 29, 34, 0.66); }

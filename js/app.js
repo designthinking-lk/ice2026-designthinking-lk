@@ -257,6 +257,8 @@
     // on People, the hive goes full-bleed over the rail (letters above the
     // half octagon; the I's cavity hosts the nav)
     document.body.classList.toggle('hive-full', isPeople);
+    // landing: chrome floats transparent over the full-screen feature video
+    document.body.classList.toggle('landing-bg', /^#\/?$/.test(location.hash || '#/'));
     // active nav
     var hash = location.hash || '#/';
     $all('#nav a').forEach(function (a) {
