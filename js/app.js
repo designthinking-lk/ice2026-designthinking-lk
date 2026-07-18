@@ -1889,11 +1889,7 @@
   function viewSkills() {
     var d = state.data;
     if (!d) return skeletons();
-    return '<div class="skills3d-wrap">' +
-      '<canvas id="skillsCanvas"></canvas>' +
-      '<div class="skills3d-head"><h2>Skills in the room</h2>' +
-      '<p>Drag to orbit &middot; scroll to zoom &middot; click a skill to meet its people</p></div>' +
-      '</div>';
+    return '<div class="skills3d-wrap"><canvas id="skillsCanvas"></canvas></div>';
   }
 
   function initSkillsGraph(canvas) {
@@ -1989,7 +1985,7 @@
       if (!dragging) return;
       var dX = e.clientX - lastX, dY = e.clientY - lastY;
       moved += Math.abs(dX) + Math.abs(dY);
-      vyaw = dX * 0.005; vpitch = dY * 0.005;
+      vyaw = dX * 0.005; vpitch = -dY * 0.005; // Y inverted — pull down to tilt up
       yaw += vyaw; pitch = Math.max(-1.4, Math.min(1.4, pitch + vpitch));
       lastX = e.clientX; lastY = e.clientY;
     });
@@ -2019,7 +2015,7 @@
       ctx.clearRect(0, 0, W, H);
 
       if (!dragging) {
-        yaw += reduceMotion ? 0 : 0.0018 + vyaw; pitch += vpitch;
+        yaw += reduceMotion ? 0 : 0.0008 + vyaw; pitch += vpitch;
         vyaw *= 0.95; vpitch *= 0.95;
         pitch = Math.max(-1.4, Math.min(1.4, pitch));
       }
