@@ -453,12 +453,18 @@
       state.teamFilter = null; // team went away
     }
     // chain stack: later chips tuck under earlier ones (descending z-index),
-    // leaving just their tail letter visible — hover/selection lifts a chip out
+    // only their tail letter visible. Chips after the first hide their "Team"
+    // prefix via an invisible span — size and letter placement stay identical.
     return '<div class="hive-teams" id="hiveTeams">' +
       teams.map(function (t, i) {
+        var name = String(t.name || '');
+        var cut = name.lastIndexOf(' ') + 1;
+        var label = (i === 0 || !cut)
+          ? esc(name)
+          : '<span class="tc-ghost">' + esc(name.slice(0, cut)) + '</span>' + esc(name.slice(cut));
         return '<button class="team-chip' + (t.id === state.teamFilter ? ' on' : '') + (t.demo ? ' demo' : '') + '" type="button" ' +
           'style="z-index:' + (teams.length - i) + '" ' +
-          'data-action="filter-team" data-team="' + esc(t.id) + '" data-name="' + esc(t.name) + '">' + esc(t.name) + '</button>';
+          'data-action="filter-team" data-team="' + esc(t.id) + '" data-name="' + esc(t.name) + '">' + label + '</button>';
       }).join('') + '</div>';
   }
 
