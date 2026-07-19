@@ -241,6 +241,8 @@ button { font-family: inherit; }
   position: absolute; left: 208px; bottom: 72px; z-index: 1;
   pointer-events: none; /* only the link below re-enables clicks */
   opacity: 0; animation: li-in 1.2s ease 0.6s forwards;
+  /* halo of the page colour keeps the words readable over moving footage */
+  text-shadow: 0 1px 14px var(--bg), 0 0 3px var(--bg);
 }
 @keyframes li-in { to { opacity: 1; } }
 .landing-intro .li-kicker {
@@ -1297,16 +1299,13 @@ body.hive-full .project-switcher select { pointer-events: auto; }
 .pg-gap { flex: none; border-bottom: 1px dashed var(--border-strong); margin: 1px 16%; }
 .pg-skeleton { background: var(--bg-subtle); animation: pg-pulse 1.8s ease-in-out infinite; }
 @keyframes pg-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
-.pg-real {
-  background: rgba(97, 0, 255, 0.08);
-  border: 1px solid rgba(97, 0, 255, 0.28);
-}
+.pg-real { background: rgba(97, 0, 255, 0.09); } /* borderless — gentle tint only */
 .pg-ev-title {
   font-size: 12px; font-weight: 700; color: var(--text); line-height: 1.2;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pg-ev-meta { font-size: 10.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-:root[data-theme="dark"] .pg-real { background: rgba(0, 215, 238, 0.1); border-color: rgba(0, 215, 238, 0.3); }
+:root[data-theme="dark"] .pg-real { background: rgba(0, 215, 238, 0.11); }
 
 /* ------------------------------------------------------------ site credit */
 /* Public-view footer: workshop credit + sponsor logos, bottom-center. */
