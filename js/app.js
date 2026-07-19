@@ -1920,6 +1920,92 @@
     return '<div class="empty" style="margin-top:40px"><i class="fa-solid fa-toolbox"></i>Tools are coming soon.<br>Handy links and resources for the workshop will live here.</div>';
   }
 
+  // ------------------------------------------------------------- program
+  // View-only 3-day agenda: columns are workshop days, rows 8:00 → 18:00.
+  // Renders a skeleton immediately; initProgram() swaps in real events from
+  // the backend's Google Calendar pull once it's configured.
+  var PG_START = 8, PG_END = 18, PG_HOUR_PX = 60;
+
+  function programDayLabels() {
+    var p = proj();
+    var labels = [];
+    if (p.startDate && /^\d{4}-\d{2}-\d{2}$/.test(p.startDate)) {
+      var d0 = new Date(p.startDate + 'T12:00:00');
+      for (var i = 0; i < 3; i++) {
+        var d = new Date(d0.getTime() + i * 864e5);
+        labels.push('Day ' + (i + 1) + ' — ' +
+          d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }));
+      }
+    } else {
+      labels = ['Day 1', 'Day 2', 'Day 3'];
+    }
+    return labels;
+  }
+
+  // placeholder blocks (start hour, duration h) per day — replaced by live data
+  var PG_SKELETON = [
+    [[8.5, 1.5], [10.5, 1.5], [13, 2], [15.5, 1.5]],
+    [[9, 1.5], [11, 1.5], [13.5, 2.5], [16.5, 1]],
+    [[8.5, 1], [10, 2], [13, 1.5], [15, 2.5]],
+  ];
+
+  function viewProgram() {
+    var hours = '';
+    for (var h = PG_START; h <= PG_END; h++) {
+      hours += '<span class="pg-time" style="top:' + ((h - PG_START) * PG_HOUR_PX + 46) + 'px">' +
+        ((h % 12) || 12) + (h < 12 ? ' AM' : ' PM') + '</span>';
+    }
+    var labels = programDayLabels();
+    var cols = labels.map(function (label, di) {
+      var blocks = PG_SKELETON[di].map(function (b) {
+        return '<div class="pg-event pg-skeleton" style="top:' + ((b[0] - PG_START) * PG_HOUR_PX) + 'px;height:' +
+          (b[1] * PG_HOUR_PX - 6) + 'px"></div>';
+      }).join('');
+      return '<div class="pg-day"><div class="pg-day-head">' + esc(label) + '</div>' +
+        '<div class="pg-day-body" data-di="' + di + '">' + blocks + '</div></div>';
+    }).join('');
+    return '<div class="program-wrap"><div class="program-grid">' +
+      '<div class="pg-times">' + hours + '</div>' + cols + '</div></div>';
+  }
+
+  function initProgram() {
+    A.api('program').then(function (r) {
+      if (!r.configured || !(r.events || []).length) return; // keep the skeleton
+      if (!$('.program-grid')) return; // view changed meanwhile
+      // bucket events into the three day columns by calendar date
+      var p = proj();
+      var dayKeys = [];
+      if (p.startDate && /^\d{4}-\d{2}-\d{2}$/.test(p.startDate)) {
+        var d0 = new Date(p.startDate + 'T12:00:00');
+        for (var i = 0; i < 3; i++) dayKeys.push(new Date(d0.getTime() + i * 864e5).toDateString());
+      } else {
+        // no project dates: take the first three distinct event days
+        r.events.forEach(function (ev) {
+          var k = new Date(ev.start).toDateString();
+          if (dayKeys.indexOf(k) === -1 && dayKeys.length < 3) dayKeys.push(k);
+        });
+      }
+      $all('.pg-day-body').forEach(function (body) {
+        var di = Number(body.getAttribute('data-di'));
+        var html = '';
+        r.events.forEach(function (ev) {
+          if (ev.allDay) return;
+          var s = new Date(ev.start), e = new Date(ev.end);
+          if (s.toDateString() !== dayKeys[di]) return;
+          var sh = Math.max(PG_START, s.getHours() + s.getMinutes() / 60);
+          var eh = Math.min(PG_END, e.getHours() + e.getMinutes() / 60);
+          if (eh <= sh) return;
+          var t = s.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+          html += '<div class="pg-event pg-real" style="top:' + ((sh - PG_START) * PG_HOUR_PX) + 'px;height:' +
+            ((eh - sh) * PG_HOUR_PX - 6) + 'px">' +
+            '<div class="pg-ev-title">' + esc(ev.title) + '</div>' +
+            '<div class="pg-ev-meta">' + esc(t) + (ev.location ? ' · ' + esc(ev.location) : '') + '</div></div>';
+        });
+        if (html) body.innerHTML = html;
+      });
+    }).catch(function () { /* skeleton stays */ });
+  }
+
   // Skills across the whole room — a 3D constellation: skills are nodes
   // (sized by how many people bring them), lines join skills that live in the
   // same person. Drag orbits like a 3D viewport; click a node to meet its
@@ -2284,6 +2370,7 @@
     { re: /^#\/team\/([\w-]+)$/, view: viewTeam },
     { re: /^#\/projects$/, view: viewProjects },
     { re: /^#\/skills$/, view: viewSkills },
+    { re: /^#\/program$/, view: viewProgram },
     { re: /^#\/tools$/, view: viewTools },
     { re: /^#\/announcements$/, view: viewAnnouncements },
     { re: /^#\/register$/, view: viewRegister },
@@ -2324,6 +2411,8 @@
     // landing video: fade in on actual playback
     var fv = $('.feature-video');
     if (fv) initLandingVideo(fv);
+    // program: swap the skeleton for live calendar events when configured
+    if ($('.program-grid')) initProgram();
     // skill tag input
     var skillInput = $('#skillInput');
     if (skillInput) {
