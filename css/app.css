@@ -1308,12 +1308,18 @@ body.hive-full .project-switcher select { pointer-events: auto; }
 :root[data-theme="dark"] .pg-real { background: rgba(0, 215, 238, 0.11); }
 
 /* ------------------------------------------------------------ site credit */
-/* Public-view footer: workshop credit + sponsor logos, bottom-center. */
+/* Public-view footer: workshop credit + sponsor logos, bottom-center.
+   Opaque like the app bar — scrolling content passes behind it, not through
+   it (the fab-stack lives inside this band too). */
 .site-credit {
-  position: fixed; left: 0; right: 0; bottom: 18px; z-index: 5;
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
   display: flex; align-items: center; justify-content: center; gap: 26px;
+  padding: 15px 0 17px;
+  background: var(--bg);
   font-size: 13.5px; color: var(--text-muted); pointer-events: none;
 }
+/* while the footer band is up, let views scroll their last items clear of it */
+body:has(.site-credit:not([hidden])) .view { padding-bottom: 84px; }
 .site-credit[hidden] { display: none; } /* our display:flex would defeat [hidden] */
 .site-credit a { pointer-events: auto; text-decoration: none; }
 .credit-name {
@@ -1338,6 +1344,9 @@ body.hive-full .project-switcher select { pointer-events: auto; }
    their content floats above; the nav's octagon turns glassy for legibility.
    (Kept last so it outranks the night-mode surface rules above.) */
 body.landing-bg .sidebar, body.landing-bg .topbar { background: transparent; }
+/* nothing scrolls on the landing — a solid footer band would hard-cut the
+   video's bottom fade, so it goes clear here like the rest of the chrome */
+body.landing-bg .site-credit { background: transparent; }
 /* landing-only layering: video (z0) < topbar (z2) < sidebar (z3, so the fixed
    animated brand in its stacking context rides above the topbar). Scoped here
    because a global sidebar z-index would cover the People hive's rail tiles. */
@@ -1381,15 +1390,16 @@ body.landing-bg .side-oct {
 }
 .ab-sub { color: var(--text-muted); font-size: 14.5px; margin: -6px 0 18px; }
 
-/* journey — three numbered steps in a row */
+/* journey — three numbered steps in a row, number + title on one line */
 .ab-journey { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+.ab-step-head { display: flex; align-items: center; gap: 11px; margin-bottom: 8px; }
 .ab-step-n {
-  display: inline-flex; align-items: center; justify-content: center;
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
   width: 30px; height: 30px; clip-path: url(#octr);
   background: var(--gradient-brand); color: #fff;
   font-family: var(--font-display); font-weight: 700; font-size: 14px;
 }
-.ab-step h3 { font-size: 15.5px; margin: 10px 0 6px; letter-spacing: -0.01em; }
+.ab-step h3 { font-size: 15.5px; margin: 0; letter-spacing: -0.01em; }
 .ab-step p { color: var(--text-body); font-size: 13.5px; line-height: 1.5; }
 
 /* curriculum — six phase blocks, accent keyword + plain list */
@@ -1400,9 +1410,9 @@ body.landing-bg .side-oct {
 }
 .ab-cur p { color: var(--text-body); font-size: 13.5px; line-height: 1.5; }
 
-/* designer */
-.ab-designer { display: flex; gap: 22px; align-items: flex-start; }
-.ab-portrait { width: 96px; height: 96px; object-fit: cover; flex: none; clip-path: url(#octr); }
+/* designer — portrait sized to sit flush with the bio block's height */
+.ab-designer { display: flex; gap: 24px; align-items: center; }
+.ab-portrait { width: 132px; height: 132px; object-fit: cover; flex: none; clip-path: url(#octr); }
 .ab-designer p { color: var(--text-body); font-size: 14.5px; line-height: 1.55; }
 .ab-designer a { color: var(--color-accent); text-decoration: none; font-weight: 600; white-space: nowrap; }
 .ab-designer a i { font-size: 11px; }
@@ -1416,12 +1426,23 @@ body.landing-bg .side-oct {
 .ab-quote figcaption span { display: flex; flex-direction: column; font-size: 12.5px; color: var(--text-muted); }
 .ab-quote figcaption b { font-family: var(--font-display); font-size: 13.5px; color: var(--text); }
 
-/* alumni — small octagon tiles, same shape family as the People hive */
-.ab-alumni { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 22px 24px; }
-.ab-alum { display: flex; flex-direction: column; }
-.ab-alum img { width: 78px; height: 78px; object-fit: cover; clip-path: url(#octr); }
-.ab-alum b { font-family: var(--font-display); font-size: 13.5px; letter-spacing: -0.01em; margin-top: 9px; }
-.ab-alum span { color: var(--text-muted); font-size: 12.5px; line-height: 1.35; }
+/* alumni — capsule cards: the octagon photo IS the left cap, a tinted strip
+   continues seamlessly behind it (it slides under the photo's flat edge zone,
+   so the two silhouettes fuse) and ends in a half-octagon on the right. The
+   45° end cuts are fixed-pixel (clip-path polygon), matching the photo's
+   corner angle at this 78px height — #octr would stretch on a wide box. */
+.ab-alumni { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px 24px; }
+.ab-alum { display: flex; align-items: center; height: 78px; }
+.ab-alum img { width: 78px; height: 78px; object-fit: cover; clip-path: url(#octr); position: relative; z-index: 1; flex: none; }
+.ab-alum-body {
+  flex: 1; align-self: stretch; min-width: 0;
+  display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  margin-left: -34px; padding: 4px 30px 4px 46px;
+  background: var(--bg-subtle);
+  clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%);
+}
+.ab-alum b { font-family: var(--font-display); font-size: 13.5px; letter-spacing: -0.01em; }
+.ab-alum span { color: var(--text-muted); font-size: 12px; line-height: 1.3; }
 
 /* outro — pointer to live projects + org links */
 .ab-outro { border-top: 1px solid var(--border); padding-top: 24px; }

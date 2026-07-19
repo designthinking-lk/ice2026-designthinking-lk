@@ -2007,14 +2007,14 @@
       '<h2>The journey</h2>' +
       '<div class="ab-journey">' +
       AB_JOURNEY.map(function (s, i) {
-        return '<div class="ab-step"><span class="ab-step-n">' + (i + 1) + '</span>' +
-          '<h3>' + s[0] + '</h3><p>' + s[1] + '</p></div>';
+        return '<div class="ab-step"><div class="ab-step-head"><span class="ab-step-n">' + (i + 1) + '</span>' +
+          '<h3>' + s[0] + '</h3></div><p>' + s[1] + '</p></div>';
       }).join('') +
       '</div></section>' +
 
       '<section class="ab-section">' +
-      '<h2>What you’ll learn</h2>' +
-      '<p class="ab-sub">Identify, practice and apply the key elements of AI, design thinking and entrepreneurship — for a lifelong journey, not just three days.</p>' +
+      '<h2>What participants learn</h2>' +
+      '<p class="ab-sub">Participants identify, practice and apply the key elements of AI, design thinking and entrepreneurship — a foundation for a lifelong journey, not just three days.</p>' +
       '<div class="ab-curriculum">' +
       AB_CURRICULUM.map(function (c) {
         return '<div class="ab-cur"><h3>' + c[0] + '</h3><p>' + c[1] + '</p></div>';
@@ -2045,7 +2045,7 @@
       '<div class="ab-alumni">' +
       AB_ALUMNI.map(function (a) {
         return '<div class="ab-alum"><img src="assets/about/' + a.img + '.jpg" alt="">' +
-          '<b>' + a.name + '</b><span>' + a.role + '</span></div>';
+          '<div class="ab-alum-body"><b>' + a.name + '</b><span>' + a.role + '</span></div></div>';
       }).join('') +
       '</div></section>' +
 
