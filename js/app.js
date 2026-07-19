@@ -2651,19 +2651,23 @@
   function inviteCardHtml() {
     var c = inviteCard;
     var n = c.chips.length;
+    // The frozen (sending) state must survive a full re-render — the periodic
+    // refresh() can rebuild the view while the batch is still in flight.
+    var frozen = !!c.sending;
+    var dis = frozen ? ' disabled' : '';
     var chips = c.chips.map(function (em, i) {
       return '<span class="chip static echip">' + esc(em) +
-        '<button type="button" class="chip-x" data-action="invite-chip-x" data-idx="' + i + '" title="Remove"><i class="fa-solid fa-xmark"></i></button></span>';
+        '<button type="button" class="chip-x" data-action="invite-chip-x" data-idx="' + i + '" title="Remove"' + dis + '><i class="fa-solid fa-xmark"></i></button></span>';
     }).join('');
     return '<div class="panel invite-card">' +
       '<h3><i class="fa-regular fa-paper-plane"></i>Invite ' + (c.role === 'mentor' ? 'mentors' : 'participants') + '</h3>' +
       '<div class="tag-input invite-input" data-action="invite-focus">' + chips +
-      '<input id="inviteEntry" type="text" autocomplete="off" spellcheck="false" value="' + esc(c.text || '') + '" placeholder="' + (n ? 'Add another…' : 'Type or paste email addresses…') + '">' +
+      '<input id="inviteEntry" type="text" autocomplete="off" spellcheck="false" value="' + esc(c.text || '') + '" placeholder="' + (n ? 'Add another…' : 'Type or paste email addresses…') + '"' + dis + '>' +
       '</div>' +
       '<p class="invite-hint">Each address gets an invitation email to sign in and complete registration as a ' + c.role + '. Only invited addresses can register.</p>' +
       '<div class="form-actions" style="margin-top:14px">' +
-      '<button class="btn btn-gradient btn-sm" data-action="invite-send"' + (n ? '' : ' disabled') + '><span class="label"><i class="fa-regular fa-paper-plane"></i> Send ' + (n ? n + ' ' : '') + 'invitation' + (n === 1 ? '' : 's') + '</span><span class="spin"></span></button>' +
-      '<button class="btn btn-ghost btn-sm" data-action="invite-cancel">Cancel</button>' +
+      '<button class="btn btn-gradient btn-sm' + (frozen ? ' loading' : '') + '" data-action="invite-send"' + (n && !frozen ? '' : ' disabled') + '><span class="label"><i class="fa-regular fa-paper-plane"></i> Send ' + (n ? n + ' ' : '') + 'invitation' + (n === 1 ? '' : 's') + '</span><span class="spin"></span></button>' +
+      '<button class="btn btn-ghost btn-sm" data-action="invite-cancel"' + dis + '>Cancel</button>' +
       '</div></div>';
   }
 
@@ -3185,22 +3189,28 @@
         break;
       }
       case 'invite-open': {
+        if (inviteCard && inviteCard.sending) break;
         inviteCard = { role: t.getAttribute('data-role') === 'mentor' ? 'mentor' : 'participant', chips: [] };
         route();
         var invEntry0 = $('#inviteEntry');
         if (invEntry0) invEntry0.focus();
         break;
       }
-      case 'invite-cancel': inviteCard = null; route(); break;
+      case 'invite-cancel': {
+        if (inviteCard && inviteCard.sending) break;
+        inviteCard = null;
+        route();
+        break;
+      }
       case 'invite-focus': { var invFoc = $('#inviteEntry'); if (invFoc) invFoc.focus(); break; }
       case 'invite-chip-x': {
-        if (!inviteCard) break;
+        if (!inviteCard || inviteCard.sending) break;
         inviteCard.chips.splice(Number(t.getAttribute('data-idx')), 1);
         renderInviteCard();
         break;
       }
       case 'invite-send': {
-        if (!inviteCard) break;
+        if (!inviteCard || inviteCard.sending) break;
         // absorb whatever is still sitting uncommitted in the input
         var invEntry = $('#inviteEntry');
         if (invEntry && invEntry.value.trim()) {
@@ -3212,6 +3222,11 @@
           }
         }
         if (!inviteCard.chips.length) { renderInviteCard(); break; }
+        // Freeze the composer while the batch is in flight — cancelling or
+        // editing chips mid-request would misreport what was actually sent.
+        inviteCard.sending = true;
+        $all('.invite-card [data-action="invite-cancel"], .invite-card .chip-x, .invite-card #inviteEntry')
+          .forEach(function (el) { el.disabled = true; });
         busy(t, true);
         try {
           var invRes = await A.api('admin_invite', { emails: inviteCard.chips, role: inviteCard.role });
@@ -3222,7 +3237,14 @@
           inviteCard = null;
           await refresh();
           toast(invMsg.join(' · ') || 'Nothing to send', invRes.failed.length > 0);
-        } catch (err) { toast(err.message, true); busy(t, false); }
+        } catch (err) {
+          toast(err.message, true);
+          busy(t, false);
+          if (inviteCard) {
+            inviteCard.sending = false;
+            renderInviteCard(); // thaw — chips are kept for a retry
+          }
+        }
         break;
       }
       case 'invite-resend': {
@@ -3401,7 +3423,7 @@
   // removes the last chip.
   document.addEventListener('keydown', function (e) {
     var input = e.target;
-    if (!inviteCard || !input || input.id !== 'inviteEntry') return;
+    if (!inviteCard || inviteCard.sending || !input || input.id !== 'inviteEntry') return;
     if (e.key === 'Enter' || e.key === ',' || e.key === ';' || e.key === ' ') {
       e.preventDefault();
       if (!input.value.trim()) return;
@@ -3418,7 +3440,7 @@
 
   document.addEventListener('paste', function (e) {
     var input = e.target;
-    if (!inviteCard || !input || input.id !== 'inviteEntry') return;
+    if (!inviteCard || inviteCard.sending || !input || input.id !== 'inviteEntry') return;
     e.preventDefault();
     var text = (e.clipboardData || window.clipboardData).getData('text');
     var bad = inviteAbsorb(input.value + ' ' + text);
