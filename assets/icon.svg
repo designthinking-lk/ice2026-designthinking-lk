@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="g" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#00D7EE"/>
+      <stop offset="1" stop-color="#6100FF"/>
+    </linearGradient>
+  </defs>
+  <!-- full-bleed: platforms apply their own mask; ICE mark stays in the central 60% safe zone -->
+  <rect width="512" height="512" fill="url(#g)"/>
+  <text x="256" y="315" font-family="Helvetica, Arial, sans-serif" font-size="170" font-weight="800" fill="#fff" text-anchor="middle">ICE</text>
+</svg>

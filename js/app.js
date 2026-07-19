@@ -2573,6 +2573,93 @@
       '<a class="btn btn-ghost btn-sm" href="#/announcements">Manage on the news page</a></div>';
   }
 
+  // ---- Teams tab: assign every registered person into Team A–F ----
+  // Capacity per team: 5 participants + 2 mentors (the backend enforces the
+  // same caps, so a stale board can never oversubscribe a team).
+  var TEAM_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+  var TEAM_CAP = { participant: 5, mentor: 2 };
+
+  // Mentors and admins occupy mentor slots; everyone else is a participant.
+  function teamSlot(u) { return u.role === 'participant' ? 'participant' : 'mentor'; }
+
+  function adminTeamsSection(d) {
+    var users = d.users || [];
+    if (!users.length) return '<div class="empty"><i class="fa-solid fa-users"></i>Nobody has registered yet.</div>';
+    var byId = {};
+    users.forEach(function (u) { byId[u.id] = u; });
+    // The letter teams as they exist in the data (rows are created server-side
+    // on first assignment), the letter each user sits in, and per-team counts.
+    var assigned = {}; // userId -> letter
+    var counts = {};   // letter -> { participant, mentor }
+    var teamOf = {};   // letter -> { mentors: [], participants: [] }
+    TEAM_LETTERS.forEach(function (L) {
+      counts[L] = { participant: 0, mentor: 0 };
+      teamOf[L] = { mentor: [], participant: [] };
+      var wanted = ('team ' + L).toLowerCase();
+      (d.teams || []).forEach(function (t) {
+        if (String(t.name || '').trim().toLowerCase() !== wanted) return;
+        (t.members || []).forEach(function (id) {
+          var u = byId[id];
+          if (!u) return;
+          var s = teamSlot(u);
+          assigned[u.id] = L;
+          counts[L][s]++;
+          teamOf[L][s].push(u);
+        });
+      });
+    });
+
+    function memberRow(u, L) {
+      return '<div class="tb-member">' + avatar(u, 'avatar-sm') +
+        '<a href="#/profile/' + esc(u.id) + '">' + esc(u.name) + '</a>' +
+        (teamSlot(u) === 'mentor' ? '<span class="tb-tag">mentor</span>' : '') +
+        '<button class="tb-remove" type="button" data-action="unassign-team" data-id="' + esc(u.id) + '" title="Remove from Team ' + L + '"><i class="fa-solid fa-xmark"></i></button></div>';
+    }
+
+    var cards = TEAM_LETTERS.map(function (L) {
+      var slots = '';
+      teamOf[L].mentor.forEach(function (u) { slots += memberRow(u, L); });
+      for (var i = counts[L].mentor; i < TEAM_CAP.mentor; i++) slots += '<div class="tb-member tb-empty">mentor slot</div>';
+      teamOf[L].participant.forEach(function (u) { slots += memberRow(u, L); });
+      for (var j = counts[L].participant; j < TEAM_CAP.participant; j++) slots += '<div class="tb-member tb-empty">participant slot</div>';
+      var full = counts[L].mentor >= TEAM_CAP.mentor && counts[L].participant >= TEAM_CAP.participant;
+      return '<div class="tb-card"><div class="tb-head"><h3>Team ' + L + '</h3>' +
+        '<span class="tb-counts' + (full ? ' full' : '') + '">' +
+        counts[L].mentor + '/' + TEAM_CAP.mentor + ' <i class="fa-solid fa-user-tie" title="mentors"></i> &nbsp; ' +
+        counts[L].participant + '/' + TEAM_CAP.participant + ' <i class="fa-solid fa-user" title="participants"></i></span>' +
+        '</div>' + slots + '</div>';
+    }).join('');
+
+    // Unassigned pool — organizers (admins) sit this out; mentors first.
+    var pool = users.filter(function (u) { return u.role !== 'admin' && !assigned[u.id]; })
+      .sort(function (a, b) {
+        var s = teamSlot(a) === teamSlot(b) ? 0 : (teamSlot(a) === 'mentor' ? -1 : 1);
+        return s || (a.name || '').localeCompare(b.name || '');
+      });
+    var poolRows = pool.map(function (u) {
+      var st = teamSlot(u);
+      return '<div class="tb-member">' + avatar(u, 'avatar-sm') +
+        '<a href="#/profile/' + esc(u.id) + '">' + esc(u.name) + '</a>' +
+        (st === 'mentor' ? '<span class="tb-tag">mentor</span>' : '') +
+        '<span class="tb-letters">' + TEAM_LETTERS.map(function (L) {
+          var isFull = counts[L][st] >= TEAM_CAP[st];
+          return '<button type="button" class="tb-letter" data-action="assign-team" data-id="' + esc(u.id) + '" data-team="' + L + '"' +
+            (isFull ? ' disabled title="Team ' + L + ' has no free ' + st + ' slot"' : ' title="Assign to Team ' + L + '"') + '>' + L + '</button>';
+        }).join('') + '</span></div>';
+    }).join('');
+
+    var assignedCount = Object.keys(assigned).length;
+    var assignable = users.filter(function (u) { return u.role !== 'admin'; }).length;
+    return '<div class="teamboard">' +
+      '<div class="panel"><h3><i class="fa-solid fa-user-plus"></i>Unassigned' +
+      '<span class="tb-progress">' + assignedCount + ' of ' + assignable + ' assigned</span></h3>' +
+      (pool.length ? '<div class="tb-pool">' + poolRows + '</div>'
+                   : '<p class="tb-done"><i class="fa-solid fa-circle-check"></i> Everyone is on a team.</p>') +
+      '</div>' +
+      '<div class="tb-grid">' + cards + '</div>' +
+      '</div>';
+  }
+
   // Which admin tab is showing; People is home. (Storage links live inside
   // each project row — no separate Resources tab.)
   var adminTab = 'people';
@@ -2583,6 +2670,7 @@
     if (!d.isAdmin) return '<div class="empty" style="margin-top:40px"><i class="fa-solid fa-shield-halved"></i>Admins only.</div>';
     var users = (d.users || []);
     var tabs = [{ id: 'people', label: 'People (' + users.length + ')' }];
+    tabs.push({ id: 'teams', label: 'Teams' });
     if (d.registryUrl) tabs.push({ id: 'projects', label: 'Projects' });
     tabs.push({ id: 'event', label: 'Event' });
     if (!tabs.some(function (t) { return t.id === adminTab; })) adminTab = 'people';
@@ -2590,6 +2678,7 @@
       return '<button class="comm-tab' + (t.id === adminTab ? ' active' : '') + '" type="button" data-action="admin-tab" data-tab="' + t.id + '">' + t.label + '</button>';
     }).join('') + '</div>';
     var body =
+      adminTab === 'teams' ? adminTeamsSection(d) :
       adminTab === 'projects' ? projectsPanel(d) :
       adminTab === 'event' ? adminEventSection(d) :
       adminPeopleSection(d);
@@ -2932,6 +3021,23 @@
       case 'cancel-new-project': showNewProject = false; route(); break;
       case 'switch-project-btn': switchProject(t.getAttribute('data-proj')); break;
       case 'admin-tab': adminTab = t.getAttribute('data-tab'); route(); break;
+      case 'assign-team':
+      case 'unassign-team': {
+        var teamLetter = action === 'assign-team' ? t.getAttribute('data-team') : '';
+        t.disabled = true; // no double-fires while the request is in flight
+        try {
+          var ar = await A.api('admin_assign_team', { userId: id, team: teamLetter });
+          if (ar.teams) { state.data.teams = ar.teams; A.writeCache(state.data); }
+          route();
+          var au = userById(id);
+          toast((au ? au.name : 'User') + (teamLetter ? ' → Team ' + teamLetter : ' unassigned'));
+        } catch (err) {
+          t.disabled = false;
+          toast(err.message, true);
+          refresh(); // board may be stale (someone else assigned) — resync
+        }
+        break;
+      }
       case 'save-dates': {
         var sd = $('#evStart') ? $('#evStart').value : '';
         var ed = $('#evEnd') ? $('#evEnd').value : '';

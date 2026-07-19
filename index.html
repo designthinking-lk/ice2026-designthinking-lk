@@ -6,13 +6,35 @@
   <title>ICE — Innovation &amp; Collaboration</title>
   <meta name="description" content="ICE workshops — meet the mentors and participants, form teams, and build together. Hosted by the Augmented Human Lab.">
 
-  <!-- Social cards -->
-  <meta property="og:title" content="ICE — Design Thinking Workshops">
-  <meta property="og:description" content="Meet the mentors and participants, form teams, and build together.">
-  <meta property="og:type" content="website">
-  <meta name="theme-color" content="#6100FF">
+  <link rel="canonical" href="https://ice2026.designthinking.lk/">
 
+  <!-- Open Graph (Facebook, LinkedIn, WhatsApp, Slack, iMessage, Discord) -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ICE — Design Thinking Workshops">
+  <meta property="og:title" content="ICE — Design Thinking Workshops">
+  <meta property="og:description" content="Meet the mentors and participants, form teams, and build together. Hosted by the Augmented Human Lab.">
+  <meta property="og:url" content="https://ice2026.designthinking.lk/">
+  <meta property="og:image" content="https://ice2026.designthinking.lk/assets/og-image.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="ICE — Design Thinking Workshops by the Augmented Human Lab, designthinking.lk">
+  <meta property="og:locale" content="en_US">
+
+  <!-- Twitter / X card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="ICE — Design Thinking Workshops">
+  <meta name="twitter:description" content="Meet the mentors and participants, form teams, and build together. Hosted by the Augmented Human Lab.">
+  <meta name="twitter:image" content="https://ice2026.designthinking.lk/assets/og-image.jpg">
+  <meta name="twitter:image:alt" content="ICE — Design Thinking Workshops by the Augmented Human Lab, designthinking.lk">
+
+  <!-- Icons + installable PWA -->
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#6100FF">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ICE">
 
   <!-- Fonts: AHLab kit (Neue Haas Grotesk); graceful fallback stacks in CSS -->
   <link rel="stylesheet" href="https://use.typekit.net/zws2qzx.css">
@@ -22,12 +44,14 @@
         crossorigin="anonymous" referrerpolicy="no-referrer">
 
   <!-- bump ?v= on any asset change: GitHub Pages caches for 10 min -->
-  <link rel="stylesheet" href="css/theme.css?v=50">
-  <link rel="stylesheet" href="css/app.css?v=50">
+  <link rel="stylesheet" href="css/theme.css?v=51">
+  <link rel="stylesheet" href="css/app.css?v=51">
   <!-- apply the saved theme before first paint so night mode never flashes -->
   <script>try{if(localStorage.getItem('ice.theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
   <!-- desktop-first: phones get the "open on desktop" gate (markup below, styles in app.css) -->
   <script>if(/Mobi|Opera Mini/i.test(navigator.userAgent))document.documentElement.classList.add('is-mobile');</script>
+  <!-- installable PWA: sw.js is network-first, so it never serves stale content while online -->
+  <script>if('serviceWorker' in navigator)addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})});</script>
 </head>
 <body>
   <!-- rounded-corner octagon clip — scales with any element (objectBoundingBox) -->
@@ -114,7 +138,7 @@
   <!-- public-view credit + sponsors — hidden once signed in (renderChrome) -->
   <footer class="site-credit" id="siteCredit" hidden>
     <span class="credit-line">Workshop by <a class="credit-name" href="https://suranga.info" target="_blank" rel="noopener">Prof. Suranga Nanayakkara</a></span>
-    <span class="credit-support">Supported by</span>
+    <span class="credit-support">supported by</span>
     <span class="credit-logos">
       <a href="https://ahlab.org" target="_blank" rel="noopener" title="Augmented Human Lab"><img src="assets/ahlab-black.svg" alt="Augmented Human Lab"></a>
       <a href="https://nus.edu.sg" target="_blank" rel="noopener" title="National University of Singapore"><img class="nus" src="assets/nus-central-black.png" alt="National University of Singapore"></a>
@@ -126,9 +150,9 @@
   <div id="modalRoot"></div>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="js/config.js?v=50"></script>
-  <script src="js/api.js?v=50"></script>
-  <script src="js/chat.js?v=50"></script>
-  <script src="js/app.js?v=50"></script>
+  <script src="js/config.js?v=51"></script>
+  <script src="js/api.js?v=51"></script>
+  <script src="js/chat.js?v=51"></script>
+  <script src="js/app.js?v=51"></script>
 </body>
 </html>
