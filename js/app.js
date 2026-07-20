@@ -445,6 +445,9 @@
       await window.IceChat.connect();
       var info = await window.IceChat.me();
       chatConn.myId = info.id;
+      // A previously captured authoritative id (from a past send) wins over the
+      // OpenID sub, so message alignment is right even before sending this time.
+      try { var saved = localStorage.getItem('ice.chat.myid'); if (saved) chatConn.myId = saved; } catch (e) { /* private mode */ }
       chatConn.ready = true;
       startUnreadPoll();   // keep the fab badge live from here on
       sweepUnread();       // fire-and-forget first pass
@@ -514,15 +517,29 @@
     } else if (!chatUI.msgs.length) {
       body = '<div class="chatpane-empty"><i class="fa-regular fa-comment"></i><span>No messages yet.<br>Say hello to ' + esc(u ? (u.name || '').split(' ')[0] : 'them') + '.</span></div>';
     } else {
-      body = chatUI.msgs.map(function (m) {
-        var mine = chatConn.myId && m.senderId === chatConn.myId;
-        return '<div class="bubble-row ' + (mine ? 'me' : 'them') + '">' +
-          '<div class="bubble">' + esc(m.text) + '</div>' +
-          '<div class="bubble-time">' + esc(timeAgo(m.createTime)) + '</div></div>';
+      var msgs = chatUI.msgs;
+      body = msgs.map(function (m, i) {
+        var mine = isMine(m);
+        var next = msgs[i + 1];
+        // A run ends when the next message is from a different sender (or none).
+        var endRun = !next || isMine(next) !== mine;
+        var side = mine ? 'me' : 'them';
+        var time = endRun ? '<div class="bubble-time">' + esc(timeAgo(m.createTime)) + '</div>' : '';
+        var bubble = '<div class="msg-main"><div class="bubble">' + esc(m.text) + '</div>' + time + '</div>';
+        if (mine) {
+          return '<div class="msg me' + (endRun ? ' end' : '') + '">' + bubble + '</div>';
+        }
+        // Their side carries the avatar, but only on the last message of a run.
+        var av = '<div class="msg-avatar">' + (endRun ? avatar(u, 'avatar-xs') : '') + '</div>';
+        return '<div class="msg them' + (endRun ? ' end' : '') + '">' + av + bubble + '</div>';
       }).join('');
     }
     return head + '<div class="convo-scroll" id="convoScroll">' + body + '</div>';
   }
+
+  // A message is mine when its sender matches my Chat id. myId comes from the
+  // OpenID sub and is corrected from the authoritative sender on first send.
+  function isMine(m) { return !!(chatConn.myId && m.senderId === chatConn.myId); }
 
   // Which tab of the comm pane is showing: 'chat' (1:1 DMs via Google Chat)
   // or 'broadcast' (announcements to everyone).
@@ -695,8 +712,12 @@
     try {
       var msg = await window.IceChat.sendMessage(chatUI.space, text);
       // The send response's sender IS me — authoritative for bubble alignment,
-      // in case the OpenID `sub` and Chat user id ever differ.
-      if (msg.senderId) chatConn.myId = msg.senderId;
+      // in case the OpenID `sub` and Chat user id ever differ. Persist it so
+      // future sessions align history correctly from the first render.
+      if (msg.senderId) {
+        chatConn.myId = msg.senderId;
+        try { localStorage.setItem('ice.chat.myid', msg.senderId); } catch (e) { /* private mode */ }
+      }
       input.value = ''; chatUI.draft = ''; autoGrow(input);
       chatUI.msgs = (chatUI.msgs || []).concat([msg]);
       markSeen(chatUI.space, msg.createTime);

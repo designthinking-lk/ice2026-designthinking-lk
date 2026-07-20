@@ -824,10 +824,6 @@ textarea.input { resize: vertical; min-height: 90px; }
 .conv .last { color: var(--text-muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
 .thread { display: flex; flex-direction: column; height: 60vh; }
 .thread-scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 6px 2px; }
-.bubble { max-width: 72%; padding: 10px 15px; border-radius: 16px; font-size: 14.5px; white-space: pre-wrap; word-break: break-word; }
-.bubble.me { align-self: flex-end; background: var(--color-accent); color: #fff; border-bottom-right-radius: 5px; }
-.bubble.them { align-self: flex-start; background: var(--bg-subtle); border: 1px solid var(--border); border-bottom-left-radius: 5px; }
-.bubble time { display: block; font-size: 10.5px; opacity: 0.65; margin-top: 3px; }
 .thread-input { display: flex; gap: 10px; margin-top: 12px; }
 .thread-input textarea { flex: 1; min-height: 44px; max-height: 120px; }
 
@@ -1266,23 +1262,35 @@ body.chat-open .chat-fab { display: none; }
 }
 .convo-back:hover { background: var(--bg-subtle); color: var(--text); }
 .convo-title { font-weight: 600; font-size: 14.5px; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.convo-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.convo-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 12px; display: flex; flex-direction: column; gap: 3px; }
 .convo-loading { flex: 1; }
 
-/* message bubbles */
-.bubble-row { display: flex; flex-direction: column; max-width: 78%; }
-.bubble-row.me { align-self: flex-end; align-items: flex-end; }
-.bubble-row.them { align-self: flex-start; align-items: flex-start; }
+/* messages — WhatsApp/iMessage style: mine right + gradient, theirs left +
+   grey with the sender's avatar at the tail of each run. */
+.msg { display: flex; align-items: flex-end; gap: 7px; max-width: 84%; }
+.msg.me { align-self: flex-end; }
+.msg.them { align-self: flex-start; }
+.msg + .msg { margin-top: 1px; }
+.msg.end { margin-bottom: 8px; }         /* extra space after a sender's run */
+.msg-avatar { flex: none; width: 26px; }  /* holds the avatar, or a spacer for run-interior messages */
+.msg-avatar .avatar { width: 26px; height: 26px; font-size: 10px; }
+.msg-main { display: flex; flex-direction: column; min-width: 0; }
+.msg.me .msg-main { align-items: flex-end; }
+.msg.them .msg-main { align-items: flex-start; }
 .bubble {
-  padding: 8px 12px; border-radius: 15px; font-size: 14px; line-height: 1.4;
-  white-space: pre-wrap; word-break: break-word;
+  width: fit-content; max-width: 100%;
+  padding: 8px 12px; border-radius: 16px; font-size: 14px; line-height: 1.4;
+  white-space: pre-wrap; overflow-wrap: break-word;   /* wrap long words only, never mid-word for short ones */
 }
-.bubble-row.them .bubble { background: var(--bg-subtle); color: var(--text-body); border-bottom-left-radius: 5px; }
-.bubble-row.me .bubble {
+.msg.them .bubble { background: var(--bg-subtle); color: var(--text-body); border-bottom-left-radius: 5px; }
+.msg.me .bubble {
   background: linear-gradient(135deg, #2E6BF6 0%, #6100FF 100%);
   color: #fff; border-bottom-right-radius: 5px;
 }
-.bubble-time { font-size: 10.5px; color: var(--text-faint); margin: 2px 4px 0; }
+/* run grouping: square the touching corners so a run reads as one column */
+.msg:not(.end).me .bubble { border-bottom-right-radius: 16px; }
+.msg:not(.end).them .bubble { border-bottom-left-radius: 16px; }
+.bubble-time { font-size: 10.5px; color: var(--text-faint); margin: 3px 4px 0; }
 
 /* chat composer (mirrors the broadcast composer) */
 .chat-compose { display: flex; gap: 8px; align-items: flex-end; }
