@@ -397,44 +397,131 @@
 
   function chatKey() { return 'ice.chat.' + A.getProject(); }
 
-  // Shown after the DM is ready but the browser wouldn't auto-open it (first
-  // message each session, once Google's consent popup used up the click). The
-  // anchor is a real user click, so the new tab is never blocked.
-  function openChatLinkModal(name, uri) {
-    modal('<div class="chat-open-modal">' +
-      '<i class="fa-regular fa-comment-dots chat-open-ic"></i>' +
-      '<h2>Conversation ready</h2>' +
-      '<p style="color:var(--text-body)">Your Google Chat with ' + esc(name) + ' is set up.</p>' +
-      '<div class="form-actions">' +
-      '<a class="btn btn-gradient" href="' + esc(uri) + '" target="_blank" rel="noopener" data-action="close-modal">' +
-      '<i class="fa-regular fa-paper-plane"></i> Open conversation</a>' +
-      '<button class="btn btn-ghost" data-action="close-modal">Not now</button>' +
-      '</div></div>');
-  }
-
   function workEmailOf(u) {
     var w = u && u.workEmail;
     return (w && /@designthinking\.lk$/i.test(w)) ? w : '';
   }
 
-  function chatPaneList() {
+  // ---- in-site Google Chat messaging (see js/chat.js) ----------------------
+  // The Chat tab is a master-detail messenger: an inbox of 1:1 DMs
+  // (chatUI.mode==='list') and one open conversation (chatUI.mode==='convo').
+  // Google Chat has no browser push, so we poll — the open conversation every
+  // CONVO_POLL ms and unread state every UNREAD_POLL ms. Read state is tracked
+  // client-side by the last-seen message createTime per space.
+  var chatUI = { mode: 'list', personId: null, space: null, msgs: null, err: '', draft: '' };
+  var chatConn = { ready: false, myId: '', connecting: false, err: '' };
+  var convoMeta = {};              // personId -> { space, lastTime, lastText, unread }
+  var convoPollTimer = null, unreadPollTimer = null;
+  var CONVO_POLL = 4000, UNREAD_POLL = 15000;
+
+  function chatConfigured() { return !!(window.IceChat && window.IceChat.configured()); }
+
+  // The people this user can DM: registered + carrying a workshop account.
+  function chatRoster() {
     var users = (state.data && state.data.users) || [];
     var mine = me();
-    var list = users.filter(function (u) {
+    return users.filter(function (u) {
       return hasAccess(u) && workEmailOf(u) && (!mine || u.id !== mine.id);
-    }).sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
-    if (!list.length) {
-      return '<div class="chatpane-empty"><i class="fa-regular fa-comment-dots"></i>' +
-        '<span>No workshop accounts yet.<br>People appear here once they register.</span></div>';
+    });
+  }
+
+  // --- read tracking (per project, in localStorage) ---
+  function seenKey() { return 'ice.chat.seen.' + A.getProject(); }
+  function loadSeen() { try { return JSON.parse(localStorage.getItem(seenKey()) || '{}'); } catch (e) { return {}; } }
+  function saveSeen(m) { try { localStorage.setItem(seenKey(), JSON.stringify(m)); } catch (e) { /* private mode */ } }
+  function markSeen(space, createTime) {
+    if (!space || !createTime) return;
+    var m = loadSeen();
+    if ((m[space] || '') < createTime) { m[space] = createTime; saveSeen(m); }
+    if (convoMeta[chatUI.personId] && convoMeta[chatUI.personId].space === space) convoMeta[chatUI.personId].unread = false;
+  }
+
+  // Acquire an OAuth token + the caller's Chat id. MUST be called from a user
+  // gesture (the consent popup needs one). Idempotent once connected.
+  async function chatConnect() {
+    if (chatConn.ready) return true;
+    chatConn.connecting = true; chatConn.err = '';
+    try {
+      await window.IceChat.connect();
+      var info = await window.IceChat.me();
+      chatConn.myId = info.id;
+      chatConn.ready = true;
+      startUnreadPoll();   // keep the fab badge live from here on
+      sweepUnread();       // fire-and-forget first pass
+      return true;
+    } catch (err) {
+      chatConn.err = err.message || 'Could not connect to Google Chat';
+      throw err;
+    } finally {
+      chatConn.connecting = false;
     }
-    return list.map(function (u) {
-      return '<button class="chat-row" data-action="chat-dm" data-email="' + esc(workEmailOf(u)) + '" title="Message ' + esc(u.name) + '">' +
+  }
+
+  function chatEmptyInbox() {
+    return '<div class="chatpane-empty"><i class="fa-regular fa-comment-dots"></i>' +
+      '<span>No workshop accounts yet.<br>People appear here once they register.</span></div>';
+  }
+
+  function chatConnectGate() {
+    return '<div class="chatpane-empty chat-gate">' +
+      '<i class="fa-regular fa-comments"></i>' +
+      '<span>Message mentors and participants right here.</span>' +
+      (chatConn.err ? '<span class="chat-gate-err">' + esc(chatConn.err) + '</span>' : '') +
+      '<button class="btn btn-gradient btn-sm" data-action="chat-connect">' +
+      '<span class="label"><i class="fa-brands fa-google"></i> Connect messaging</span><span class="spin"></span></button></div>';
+  }
+
+  // Inbox: everyone messageable, DMs-with-history first (newest reply on top),
+  // then the rest alphabetically. Unread dot + last-message preview per row.
+  function inboxHTML() {
+    var roster = chatRoster();
+    if (!roster.length) return chatEmptyInbox();
+    roster.sort(function (a, b) {
+      var ma = convoMeta[a.id], mb = convoMeta[b.id];
+      var ta = (ma && ma.lastTime) || '', tb = (mb && mb.lastTime) || '';
+      if (ta && tb) return ta < tb ? 1 : -1;
+      if (ta) return -1;
+      if (tb) return 1;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+    return roster.map(function (u) {
+      var meta = convoMeta[u.id] || {};
+      var sub = meta.lastText ? esc(clip(meta.lastText, 48)) : (u.affiliation ? esc(u.affiliation) : '');
+      return '<button class="chat-row' + (meta.unread ? ' unread' : '') + '" data-action="chat-open-dm" data-person="' + esc(u.id) + '" title="Message ' + esc(u.name) + '">' +
         avatar(u, 'avatar-sm') +
         '<span class="chat-row-info"><span class="chat-row-name">' + esc(u.name) +
         (hasRoleU(u, 'mentor') ? ' <i class="fa-solid fa-star chat-row-star" title="Mentor"></i>' : '') + '</span>' +
-        (u.affiliation ? '<span class="chat-row-sub">' + esc(u.affiliation) + '</span>' : '') + '</span>' +
-        '<i class="fa-regular fa-paper-plane chat-row-go"></i></button>';
+        (sub ? '<span class="chat-row-sub">' + sub + '</span>' : '') + '</span>' +
+        (meta.unread ? '<span class="chat-unread" aria-label="Unread"></span>' : '<i class="fa-regular fa-paper-plane chat-row-go"></i>') +
+        '</button>';
     }).join('');
+  }
+
+  function clip(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
+
+  // One open conversation: bubbles aligned by sender (mine right, theirs left).
+  function convoHTML() {
+    var u = userById(chatUI.personId);
+    var head = '<div class="convo-head">' +
+      '<button class="convo-back" data-action="chat-back" aria-label="Back"><i class="fa-solid fa-arrow-left"></i></button>' +
+      avatar(u, 'avatar-sm') +
+      '<span class="convo-title">' + esc(u ? u.name : 'Conversation') + '</span></div>';
+    var body;
+    if (chatUI.err) {
+      body = '<div class="chatpane-empty"><i class="fa-regular fa-face-frown"></i><span>' + esc(chatUI.err) + '</span></div>';
+    } else if (chatUI.msgs === null) {
+      body = '<div class="chatpane-empty convo-loading"><span class="spin-inline"></span></div>';
+    } else if (!chatUI.msgs.length) {
+      body = '<div class="chatpane-empty"><i class="fa-regular fa-comment"></i><span>No messages yet.<br>Say hello to ' + esc(u ? (u.name || '').split(' ')[0] : 'them') + '.</span></div>';
+    } else {
+      body = chatUI.msgs.map(function (m) {
+        var mine = chatConn.myId && m.senderId === chatConn.myId;
+        return '<div class="bubble-row ' + (mine ? 'me' : 'them') + '">' +
+          '<div class="bubble">' + esc(m.text) + '</div>' +
+          '<div class="bubble-time">' + esc(timeAgo(m.createTime)) + '</div></div>';
+      }).join('');
+    }
+    return head + '<div class="convo-scroll" id="convoScroll">' + body + '</div>';
   }
 
   // Which tab of the comm pane is showing: 'chat' (1:1 DMs via Google Chat)
@@ -473,12 +560,11 @@
     // preserve a broadcast draft across re-renders (refresh() redraws chrome)
     var draftEl = $('#bcastInput');
     var draft = draftEl ? draftEl.value : '';
+    // preserve a half-typed chat message too
+    var msgEl = $('#chatMsgInput');
+    if (msgEl) chatUI.draft = msgEl.value;
     if (commTab === 'chat') {
-      body.innerHTML = chatPaneList();
-      if (foot) {
-        foot.innerHTML = '<a class="chatpane-foot-link" href="https://chat.google.com" target="_blank" rel="noopener">' +
-          'Open Google Chat <i class="fa-solid fa-arrow-up-right-from-square"></i></a>';
-      }
+      renderChatTab(body, foot);
     } else {
       body.innerHTML = broadcastList();
       if (foot) {
@@ -492,13 +578,214 @@
     }
   }
 
+  // Renders the Chat tab: connect gate → inbox → conversation, plus the right
+  // foot (nothing for the inbox, a composer for a conversation).
+  function renderChatTab(body, foot) {
+    if (!chatConfigured()) {
+      body.innerHTML = '<div class="chatpane-empty"><i class="fa-regular fa-comment-dots"></i>' +
+        '<span>Messaging isn’t set up yet.<br>Contact the organizers.</span></div>';
+      if (foot) foot.innerHTML = '';
+      return;
+    }
+    if (!chatConn.ready) {
+      body.innerHTML = chatConnectGate();
+      if (foot) foot.innerHTML = '';
+      return;
+    }
+    if (chatUI.mode === 'convo') {
+      body.innerHTML = convoHTML();
+      body.classList.add('is-convo');
+      if (foot) {
+        foot.innerHTML = '<div class="chat-compose">' +
+          '<textarea class="input" id="chatMsgInput" rows="1" placeholder="Message…"></textarea>' +
+          '<button class="btn btn-gradient btn-sm" data-action="chat-send" title="Send"><span class="label"><i class="fa-regular fa-paper-plane"></i></span><span class="spin"></span></button></div>';
+        var mi = $('#chatMsgInput');
+        if (mi) {
+          mi.value = chatUI.draft || ''; autoGrow(mi);
+          var pane = $('#chatpane');
+          if (pane && !pane.hidden) mi.focus(); // don't steal focus into a hidden pane
+        }
+      }
+      scrollConvoToBottom();
+    } else {
+      body.innerHTML = inboxHTML();
+      body.classList.remove('is-convo');
+      if (foot) foot.innerHTML = '';
+    }
+  }
+
+  function autoGrow(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 110) + 'px';
+  }
+
+  function scrollConvoToBottom() {
+    var s = $('#convoScroll');
+    if (s) s.scrollTop = s.scrollHeight;
+  }
+
+  // --- conversation open/close + polling ---
+  async function openConvo(personId) {
+    var u = userById(personId);
+    var email = u && workEmailOf(u);
+    if (!email) { toast('This person has no workshop account yet.', true); return; }
+    chatUI = { mode: 'convo', personId: personId, space: null, msgs: null, err: '', draft: '' };
+    renderChatPane();
+    try {
+      await chatConnect();
+      var space = await window.IceChat.ensureDm(email);
+      chatUI.space = space;
+      var msgs = await window.IceChat.listMessages(space, 50);
+      chatUI.msgs = msgs;
+      if (msgs.length) markSeen(space, msgs[msgs.length - 1].createTime);
+      convoMeta[personId] = convoMeta[personId] || {};
+      convoMeta[personId].space = space;
+      convoMeta[personId].unread = false;
+      renderChatPane();
+      updateChatBadge();
+      startConvoPoll();
+    } catch (err) {
+      chatUI.err = err.message || 'Could not open this conversation';
+      renderChatPane();
+    }
+  }
+
+  function closeConvo() {
+    stopConvoPoll();
+    chatUI = { mode: 'list', personId: null, space: null, msgs: null, err: '', draft: '' };
+    renderChatPane();
+    sweepUnread();
+  }
+
+  function startConvoPoll() {
+    stopConvoPoll();
+    convoPollTimer = setInterval(refreshConvoMessages, CONVO_POLL);
+  }
+  function stopConvoPoll() {
+    if (convoPollTimer) { clearInterval(convoPollTimer); convoPollTimer = null; }
+  }
+
+  async function refreshConvoMessages() {
+    if (chatUI.mode !== 'convo' || !chatUI.space) return;
+    var pane = $('#chatpane');
+    if (!pane || pane.hidden) return; // don't poll a closed pane
+    try {
+      var msgs = await window.IceChat.listMessages(chatUI.space, 50);
+      var before = chatUI.msgs ? chatUI.msgs.length : 0;
+      var lastId = chatUI.msgs && chatUI.msgs.length ? chatUI.msgs[chatUI.msgs.length - 1].id : '';
+      chatUI.msgs = msgs;
+      var newLast = msgs.length ? msgs[msgs.length - 1] : null;
+      if (newLast && newLast.id !== lastId) {
+        // Only redraw the thread (keep the composer + its draft untouched).
+        var body = $('#chatpaneBody');
+        if (body) { body.innerHTML = convoHTML(); scrollConvoToBottom(); }
+        markSeen(chatUI.space, newLast.createTime);
+      } else if (!before && msgs.length) {
+        var b2 = $('#chatpaneBody'); if (b2) { b2.innerHTML = convoHTML(); scrollConvoToBottom(); }
+      }
+    } catch (err) { /* transient; next tick retries */ }
+  }
+
+  async function sendChatMessage(btn) {
+    var input = $('#chatMsgInput');
+    if (!input) return;
+    var text = input.value.trim();
+    if (!text || !chatUI.space) return;
+    busy(btn, true);
+    try {
+      var msg = await window.IceChat.sendMessage(chatUI.space, text);
+      // The send response's sender IS me — authoritative for bubble alignment,
+      // in case the OpenID `sub` and Chat user id ever differ.
+      if (msg.senderId) chatConn.myId = msg.senderId;
+      input.value = ''; chatUI.draft = ''; autoGrow(input);
+      chatUI.msgs = (chatUI.msgs || []).concat([msg]);
+      markSeen(chatUI.space, msg.createTime);
+      if (convoMeta[chatUI.personId]) {
+        convoMeta[chatUI.personId].lastTime = msg.createTime;
+        convoMeta[chatUI.personId].lastText = msg.text;
+      }
+      var body = $('#chatpaneBody');
+      if (body) { body.innerHTML = convoHTML(); scrollConvoToBottom(); }
+      input.focus();
+    } catch (err) {
+      toast(err.message || 'Message not sent', true);
+    }
+    busy(btn, false);
+  }
+
+  // --- unread sweep + fab badge ---
+  // Discovers each roster person's DM space (findDirectMessage) and its latest
+  // message, marking a conversation unread when the newest message is newer
+  // than what we've seen and wasn't sent by us.
+  async function sweepUnread() {
+    if (!chatConn.ready || !chatConfigured()) return;
+    var roster = chatRoster();
+    var seen = loadSeen();
+    for (var i = 0; i < roster.length; i++) {
+      var u = roster[i];
+      var email = workEmailOf(u);
+      try {
+        var space = (convoMeta[u.id] && convoMeta[u.id].space) || await window.IceChat.findDm(email);
+        if (!space) continue;
+        var last = await window.IceChat.latestMessage(space);
+        var meta = convoMeta[u.id] = convoMeta[u.id] || {};
+        meta.space = space;
+        if (last) {
+          meta.lastTime = last.createTime;
+          meta.lastText = last.text;
+          meta.unread = (seen[space] || '') < last.createTime && last.senderId !== chatConn.myId;
+        }
+      } catch (err) { /* skip this person this round */ }
+    }
+    updateChatBadge();
+    // If the inbox is on screen, reflect new previews/dots.
+    var pane = $('#chatpane');
+    if (pane && !pane.hidden && commTab === 'chat' && chatUI.mode === 'list') {
+      var body = $('#chatpaneBody'); if (body) body.innerHTML = inboxHTML();
+    }
+  }
+
+  function unreadCount() {
+    var n = 0;
+    Object.keys(convoMeta).forEach(function (k) { if (convoMeta[k] && convoMeta[k].unread) n++; });
+    return n;
+  }
+
+  function updateChatBadge() {
+    var badge = $('#chatBadge');
+    if (!badge) return;
+    var n = unreadCount();
+    badge.textContent = n > 9 ? '9+' : String(n);
+    badge.hidden = n === 0;
+  }
+
+  function startUnreadPoll() {
+    stopUnreadPoll();
+    if (!chatConn.ready) return;
+    unreadPollTimer = setInterval(function () {
+      if (chatUI.mode !== 'convo') sweepUnread();
+    }, UNREAD_POLL);
+  }
+  function stopUnreadPoll() {
+    if (unreadPollTimer) { clearInterval(unreadPollTimer); unreadPollTimer = null; }
+  }
+
   function setChatPane(open) {
     var pane = $('#chatpane');
     if (!pane) return;
     pane.hidden = !open;
     document.body.classList.toggle('chat-open', open);
     localStorage.setItem(chatKey(), open ? 'open' : 'closed');
-    if (open) renderChatPane();
+    if (open) {
+      renderChatPane();
+      // Resume polling if we're reopening onto an already-open conversation.
+      if (commTab === 'chat' && chatUI.mode === 'convo' && chatUI.space) {
+        startConvoPoll();
+        refreshConvoMessages();
+      }
+    } else {
+      stopConvoPoll();
+    }
   }
 
   // ---------------------------------------------------------------- views
@@ -896,8 +1183,9 @@
       (u.workEmail ? '<div class="meta-row"><span title="Workshop @designthinking.lk account"><i class="fa-regular fa-comment-dots"></i>' + esc(u.workEmail) + '</span></div>' : '') +
       '<div>' +
       (isMe ? '<a class="btn btn-outline btn-sm" href="#/me"><i class="fa-solid fa-pen"></i>Edit profile</a>'
-            : (signedIn() && me() ? '<button class="btn btn-primary btn-sm" data-action="chat-dm" data-email="' + esc(u.workEmail || u.email || '') + '"><i class="fa-regular fa-message"></i><span class="label">Message</span><span class="spin"></span></button>'
-                                  : '<button class="btn btn-primary btn-sm" data-action="sign-in"><i class="fa-brands fa-google"></i>Sign in to message</button>')) +
+            : (signedIn() && me()
+                ? (workEmailOf(u) ? '<button class="btn btn-primary btn-sm" data-action="chat-dm" data-person="' + esc(u.id) + '"><i class="fa-regular fa-message"></i><span class="label">Message</span><span class="spin"></span></button>' : '')
+                : '<button class="btn btn-primary btn-sm" data-action="sign-in"><i class="fa-brands fa-google"></i>Sign in to message</button>')) +
       (u.video ? ' <a class="btn btn-ghost btn-sm" href="' + esc(u.video) + '" target="_blank" rel="noopener"><i class="fa-solid fa-video"></i>Intro video</a>' : '') +
       '</div></div></div>' +
       '<div class="detail-grid"><div>' +
@@ -3151,7 +3439,21 @@
         break;
       }
       case 'toggle-chat': { var cp = $('#chatpane'); if (cp) setChatPane(cp.hidden); break; }
-      case 'comm-tab': commTab = t.getAttribute('data-tab') === 'broadcast' ? 'broadcast' : 'chat'; renderChatPane(); break;
+      case 'comm-tab':
+        commTab = t.getAttribute('data-tab') === 'broadcast' ? 'broadcast' : 'chat';
+        if (commTab === 'chat' && chatUI.mode === 'convo') closeConvo();
+        renderChatPane();
+        break;
+      case 'chat-connect': {
+        busy(t, true);
+        try { await chatConnect(); renderChatPane(); startUnreadPoll(); sweepUnread(); }
+        catch (err) { renderChatPane(); }
+        busy(t, false);
+        break;
+      }
+      case 'chat-open-dm': openConvo(t.getAttribute('data-person')); break;
+      case 'chat-back': closeConvo(); break;
+      case 'chat-send': await sendChatMessage(t); break;
       case 'bcast-send': {
         var bi = $('#bcastInput');
         var msg = bi ? bi.value.trim() : '';
@@ -3226,19 +3528,12 @@
         } catch (err) { toast(err.message, true); }
         break;
       case 'chat-dm': {
-        var chatEmail = t.getAttribute('data-email');
-        if (!chatEmail) { toast('This person has no workshop email yet.', true); break; }
-        var chatName = (t.getAttribute('title') || '').replace(/^Message\s+/, '') || 'this person';
-        busy(t, true);
-        try {
-          var dm = await window.IceChat.openDm(chatEmail);
-          // The first message each session spends its click on Google's
-          // consent popup, so the DM tab can't auto-open — offer a one-click
-          // open that stays inside our own modal.
-          if (dm && !dm.opened && dm.uri) openChatLinkModal(chatName, dm.uri);
-        }
-        catch (err) { toast(err.message || 'Could not open Google Chat', true); }
-        busy(t, false);
+        // Open the in-site messaging pane on this person's conversation.
+        var chatPerson = t.getAttribute('data-person');
+        if (!chatPerson) { toast('This person has no workshop account yet.', true); break; }
+        commTab = 'chat';
+        setChatPane(true);
+        openConvo(chatPerson);
         break;
       }
       case 'new-ann': openAnnDraft(null); break;
@@ -3458,6 +3753,17 @@
   });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') closeMenu();
+    // Chat composer: Enter sends, Shift+Enter makes a newline.
+    if (e.target && e.target.id === 'chatMsgInput' && e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      var sendBtn = document.querySelector('[data-action="chat-send"]');
+      sendChatMessage(sendBtn);
+    }
+  });
+
+  // Auto-grow the chat composer as it wraps.
+  document.addEventListener('input', function (e) {
+    if (e.target && e.target.id === 'chatMsgInput') { chatUI.draft = e.target.value; autoGrow(e.target); }
   });
 
   document.addEventListener('change', async function (e) {

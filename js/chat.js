@@ -1,27 +1,49 @@
-/* ICE — Google Chat handoff.
- * Messaging happens in real Google Chat between workshop Workspace accounts.
- * "Message" buttons call spaces.setup (creates or returns the 1:1 DM) with a
- * user-granted OAuth token, then open the DM's chat.google.com URL.
- * Dormant until ICE_CONFIG.CHAT_CLIENT_ID is set (see docs/google-chat-setup.md). */
+/* ICE — in-site Google Chat client.
+ * Messaging happens over the real Google Chat REST API, but rendered inside the
+ * ICE site (no chat.google.com hand-off). All calls use the signed-in user's
+ * OAuth token (GIS token client), so a person only ever sees their own DMs.
+ *
+ * Google Chat has no browser push, so the UI polls messages.list; and there is
+ * no "who am I" endpoint, so we read the caller's numeric id from the OpenID
+ * userinfo `sub` (which equals the Chat users/{id}) to align sent vs received.
+ *
+ * Dormant until ICE_CONFIG.CHAT_CLIENT_ID is set and the Cloud project has the
+ * Chat API configured (see docs/google-chat-setup.md). */
 (function () {
   'use strict';
 
   var C = window.ICE_CONFIG;
-  var SCOPE = 'https://www.googleapis.com/auth/chat.spaces.create';
+  // chat.spaces  → create + find/list DM spaces (setup, findDirectMessage)
+  // chat.messages → create + list messages
+  // openid/email → userinfo.sub, to tell my messages from theirs
+  var SCOPE = [
+    'openid', 'email',
+    'https://www.googleapis.com/auth/chat.spaces',
+    'https://www.googleapis.com/auth/chat.messages',
+  ].join(' ');
+  var API = 'https://chat.googleapis.com/v1/';
+
   var accessToken = null;
   var tokenExpiry = 0;
+  var meCache = null;                 // { id, email }
+  var dmByEmail = {};                 // email(lower) -> spaceName | 'none' (cached miss)
 
   function configured() {
     return !!(C.CHAT_CLIENT_ID && window.google && google.accounts && google.accounts.oauth2);
   }
 
-  function haveToken() {
+  function connected() {
     return !!(accessToken && Date.now() < tokenExpiry - 60000);
   }
 
+  // ------------------------------------------------------------------ token
+  // The consent popup must be spent inside a user gesture, so getAccessToken is
+  // only ever called from a click handler (the "Connect" button / pane open).
+
   function getAccessToken() {
     return new Promise(function (resolve, reject) {
-      if (haveToken()) return resolve(accessToken);
+      if (connected()) return resolve(accessToken);
+      if (!configured()) return reject(new Error('Google Chat is not set up yet — contact the organizers.'));
       var client = google.accounts.oauth2.initTokenClient({
         client_id: C.CHAT_CLIENT_ID,
         scope: SCOPE,
@@ -32,61 +54,126 @@
           resolve(accessToken);
         },
         error_callback: function (err) {
-          reject(new Error(err.message || 'Google sign-in was closed'));
+          reject(new Error((err && err.message) || 'Google sign-in was closed'));
         },
       });
       client.requestAccessToken();
     });
   }
 
-  async function setupDm(email) {
+  // Low-level authed fetch. On 401 (token expired mid-session) it clears the
+  // token so the next call re-prompts. Throws Error(message) on API errors.
+  async function call(method, path, body) {
     var token = await getAccessToken();
-    var res = await fetch('https://chat.googleapis.com/v1/spaces:setup', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        space: { spaceType: 'DIRECT_MESSAGE' },
-        memberships: [{ member: { name: 'users/' + email, type: 'HUMAN' } }],
-      }),
+    var res = await fetch(/^https?:/.test(path) ? path : API + path, {
+      method: method,
+      headers: {
+        Authorization: 'Bearer ' + token,
+        'Content-Type': 'application/json',
+      },
+      body: body ? JSON.stringify(body) : undefined,
     });
-    var data = await res.json();
-    if (data.error) throw new Error(data.error.message || 'Could not open the conversation');
-    return data.spaceUri || 'https://chat.google.com';
-  }
-
-  /**
-   * Open (creating if needed) the 1:1 Google Chat DM with `email`.
-   * Resolves to { opened, uri }:
-   *  - opened:true  → a new tab was navigated to the DM (nothing more to do).
-   *  - opened:false → the browser wouldn't let us open a tab from here; `uri`
-   *    is the DM link so the caller can offer a one-click open that blends
-   *    into our own UI.
-   *
-   * The single-popup-per-gesture budget is the crux: Google's consent flow
-   * needs a popup the first time. So we only pre-open the destination tab when
-   * we already hold a token (no consent popup to compete with); otherwise we
-   * spend the gesture on consent and hand the link back for a real click.
-   */
-  async function openDm(email) {
-    if (!configured()) throw new Error('Google Chat is not set up yet — contact the organizers.');
-    if (haveToken()) {
-      // Fast path: no consent popup needed, so pre-open the tab synchronously
-      // (survives the later awaits) and navigate it once the DM is ready.
-      var win = window.open('about:blank', '_blank');
-      try {
-        var uri = await setupDm(email);
-        if (win) { win.location = uri; return { opened: true, uri: uri }; }
-        return { opened: false, uri: uri }; // pop-up blocker ate the tab
-      } catch (err) {
-        if (win) win.close();
-        throw err;
-      }
+    if (res.status === 401) { accessToken = null; tokenExpiry = 0; }
+    var data = null;
+    try { data = await res.json(); } catch (e) { data = null; }
+    if (!res.ok) {
+      var msg = (data && data.error && data.error.message) || ('Chat error ' + res.status);
+      var err = new Error(msg);
+      err.status = res.status;
+      throw err;
     }
-    // First use this session: consent popup spends the gesture, so we can't
-    // also open a tab here — return the link for the caller to open on a click.
-    var uri2 = await setupDm(email);
-    return { opened: false, uri: uri2 };
+    return data || {};
   }
 
-  window.IceChat = { openDm: openDm, configured: configured };
+  // ------------------------------------------------------------------- identity
+  /** The signed-in person's Chat identity: { id, email }. id is the numeric
+   *  users/{id} value, read from the OpenID userinfo `sub`. Cached per session
+   *  and in localStorage (it never changes for a given account). */
+  async function me() {
+    if (meCache) return meCache;
+    try {
+      var stored = JSON.parse(localStorage.getItem('ice.chat.me') || 'null');
+      if (stored && stored.id) { meCache = stored; return meCache; }
+    } catch (e) { /* ignore */ }
+    var info = await call('GET', 'https://openidconnect.googleapis.com/v1/userinfo');
+    meCache = { id: String(info.sub || ''), email: String(info.email || '').toLowerCase() };
+    try { localStorage.setItem('ice.chat.me', JSON.stringify(meCache)); } catch (e) { /* ignore */ }
+    return meCache;
+  }
+
+  // -------------------------------------------------------------------- spaces
+  /** The existing 1:1 DM space with `email`, or null if none exists yet.
+   *  Uses the email alias for users/{user} (allowed for user-auth calls). */
+  async function findDm(email) {
+    var key = String(email || '').toLowerCase();
+    if (!key) return null;
+    if (dmByEmail[key]) return dmByEmail[key] === 'none' ? null : dmByEmail[key];
+    try {
+      var data = await call('GET', 'spaces:findDirectMessage?name=' + encodeURIComponent('users/' + key));
+      dmByEmail[key] = data.name || 'none';
+      return data.name || null;
+    } catch (err) {
+      if (err.status === 404) { dmByEmail[key] = 'none'; return null; }
+      throw err;
+    }
+  }
+
+  /** The DM space with `email`, creating it if it doesn't exist. */
+  async function ensureDm(email) {
+    var existing = await findDm(email);
+    if (existing) return existing;
+    var key = String(email || '').toLowerCase();
+    var data = await call('POST', 'spaces:setup', {
+      space: { spaceType: 'DIRECT_MESSAGE' },
+      memberships: [{ member: { name: 'users/' + key, type: 'HUMAN' } }],
+    });
+    if (data.name) dmByEmail[key] = data.name;
+    return data.name;
+  }
+
+  /** Messages in a space, oldest→newest. `limit` caps how many recent ones.
+   *  Returns [{ id, text, senderId, createTime }]. */
+  async function listMessages(space, limit) {
+    if (!space) return [];
+    var data = await call('GET', space + '/messages?pageSize=' + (limit || 50) + '&orderBy=' + encodeURIComponent('createTime desc'));
+    var msgs = (data.messages || []).map(function (m) {
+      return {
+        id: m.name,
+        text: m.text || '',
+        senderId: (m.sender && String(m.sender.name || '').replace('users/', '')) || '',
+        createTime: m.createTime || '',
+      };
+    });
+    msgs.reverse(); // API gave newest-first; render oldest-first
+    return msgs;
+  }
+
+  /** Latest message in a space (or null) — cheap unread probe. */
+  async function latestMessage(space) {
+    var msgs = await listMessages(space, 1);
+    return msgs.length ? msgs[msgs.length - 1] : null;
+  }
+
+  async function sendMessage(space, text) {
+    var body = { text: String(text || '') };
+    var m = await call('POST', space + '/messages', body);
+    return {
+      id: m.name,
+      text: m.text || '',
+      senderId: (m.sender && String(m.sender.name || '').replace('users/', '')) || '',
+      createTime: m.createTime || '',
+    };
+  }
+
+  window.IceChat = {
+    configured: configured,
+    connected: connected,
+    connect: getAccessToken,   // ensure a token from within a gesture
+    me: me,
+    findDm: findDm,
+    ensureDm: ensureDm,
+    listMessages: listMessages,
+    latestMessage: latestMessage,
+    sendMessage: sendMessage,
+  };
 })();
