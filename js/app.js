@@ -3281,14 +3281,13 @@
       // The selection fits only if this team has room for its mentors AND its
       // participants — 3 mentors never fit (cap 2); 2 mentors fit an empty team.
       var canFit = selCount > 0 && !teamBusy && freeM >= need.mentor && freeP >= need.participant;
-      if (canFit) {
-        slots += '<button class="tb-addhere" type="button" data-action="tb-add-here" data-team="' + L + '"' +
-          ' title="Add the ' + selCount + ' selected here">' +
-          '<i class="fa-solid fa-plus"></i> Add Here</button>';
-      }
+      // "Add Here" rides in the header next to the team name (saves a slot row).
+      var headExtra = canFit
+        ? '<button class="tb-addhere" type="button" data-action="tb-add-here" data-team="' + L + '"' +
+            ' title="Add the ' + selCount + ' selected here"><i class="fa-solid fa-plus"></i> Add Here</button>'
+        : (full ? '<span class="tb-fulltag"><i class="fa-solid fa-circle-check"></i> Full</span>' : '');
       return '<div class="tb-card' + (full ? ' tb-full' : '') + (canFit ? ' tb-target' : '') + '">' +
-        '<div class="tb-head"><h3>Team ' + L + '</h3>' +
-        (full ? '<span class="tb-fulltag"><i class="fa-solid fa-circle-check"></i> Full</span>' : '') +
+        '<div class="tb-head"><h3>Team ' + L + '</h3>' + headExtra +
         '</div><div class="tb-slots">' + slots + '</div></div>';
     }).join('');
 

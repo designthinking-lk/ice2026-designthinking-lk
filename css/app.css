@@ -1428,7 +1428,7 @@ body.hive-full .project-switcher select { pointer-events: auto; }
 /* the scrollable participant list */
 .tb-pool { overflow-y: auto; display: flex; flex-direction: column; gap: 1px; margin: 0 -6px; padding: 0 2px 4px; }
 .tb-prow { border-radius: var(--radius-sm); }
-.tb-prow-row { display: flex; align-items: center; gap: 4px; min-height: 34px; }
+.tb-prow-row { display: flex; align-items: center; gap: 4px; min-height: 30px; }
 .tb-prow-row.tb-quickactive { gap: 4px; padding: 0 4px; }
 .tb-prow-row.tb-quickactive .avatar-sm { flex: none; }
 /* the "T?" options, inline where the name was — no extra row */
@@ -1436,7 +1436,7 @@ body.hive-full .project-switcher select { pointer-events: auto; }
 .tb-quickrow .tb-qletter { flex: 1; min-width: 0; }
 .tb-prow-main {
   flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
-  padding: 4px 6px; cursor: pointer; border-radius: var(--radius-sm); user-select: none;
+  padding: 3px 6px; cursor: pointer; border-radius: var(--radius-sm); user-select: none;
 }
 .tb-prow-main:hover { background: var(--surface-2, rgba(97, 0, 255, 0.05)); }
 .tb-prow.selected .tb-prow-main { background: rgba(97, 0, 255, 0.11); }
@@ -1466,24 +1466,23 @@ body.hive-full .project-switcher select { pointer-events: auto; }
 .tb-qclose:hover { color: #C0392B; }
 @keyframes tbPop { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
 /* team cards */
-.tb-teams { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-content: start; }
+.tb-teams { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-content: start; }
 /* full-width variant when there is no unassigned column */
 .tb-teams-full { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.tb-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px; }
+.tb-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 9px 12px; }
 .tb-card.tb-full { border-color: rgba(24, 128, 56, 0.5); }
 .tb-card.tb-target { border-color: var(--color-accent); box-shadow: 0 0 0 1px var(--color-accent); }
-.tb-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
-.tb-head h3 { margin: 0; font-size: 15.5px; }
+.tb-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
+.tb-head h3 { margin: 0; font-size: 15px; }
 .tb-fulltag { color: #188038; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
-/* card slots stack one per row so the full name shows; "Add Here" is the
-   last full-width row when a selection fits */
-.tb-slots { display: grid; grid-template-columns: 1fr; gap: 3px; }
-.tb-member { display: flex; align-items: center; gap: 7px; padding: 2px 0; font-size: 13.5px; min-height: 30px; min-width: 0; }
+/* card slots stack one per row so the full name shows */
+.tb-slots { display: grid; grid-template-columns: 1fr; gap: 1px; }
+.tb-member { display: flex; align-items: center; gap: 7px; padding: 0; font-size: 13px; min-height: 24px; min-width: 0; }
 .tb-member > a { color: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tb-member .avatar-sm { flex: none; }
 .tb-empty {
-  color: var(--text-faint); font-size: 11.5px; justify-content: center;
-  border: 1px dashed var(--border); border-radius: var(--radius-sm); min-height: 28px;
+  color: var(--text-faint); font-size: 11px; justify-content: center;
+  border: 1px dashed var(--border); border-radius: var(--radius-sm); min-height: 22px;
 }
 .tb-tie { flex: none; font-size: 11px; color: var(--color-accent); }
 .tb-tag {
@@ -1492,18 +1491,18 @@ body.hive-full .project-switcher select { pointer-events: auto; }
 }
 .tb-remove {
   margin-left: auto; border: none; background: none; cursor: pointer;
-  color: var(--text-faint); padding: 4px 7px; border-radius: var(--radius-sm);
+  color: var(--text-faint); padding: 2px 6px; border-radius: var(--radius-sm);
 }
 .tb-remove:hover:not(:disabled) { color: #C0392B; background: rgba(192, 57, 43, 0.08); }
 .tb-remove:disabled { opacity: 0.4; cursor: default; }
-/* the attention-grabbing "Add Here" that fills a team's empty last cell */
+/* the attention-grabbing "Add Here" pill, tucked beside the team name */
 .tb-addhere {
-  display: flex; align-items: center; justify-content: center; gap: 5px;
-  border: none; border-radius: var(--radius-sm); cursor: pointer; min-height: 28px;
-  background: var(--gradient-brand); color: #fff; font-size: 11.5px; font-weight: 700;
-  animation: tbPulse 1.15s ease-in-out infinite;
+  margin-left: auto; display: inline-flex; align-items: center; gap: 4px;
+  border: none; border-radius: 999px; cursor: pointer; padding: 3px 11px;
+  background: var(--gradient-brand); color: #fff; font-size: 11px; font-weight: 700;
+  white-space: nowrap; animation: tbPulse 1.15s ease-in-out infinite;
 }
-.tb-addhere i { font-size: 10px; }
+.tb-addhere i { font-size: 9px; }
 .tb-addhere:hover { filter: brightness(1.08); animation: none; }
 @keyframes tbPulse {
   0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(97, 0, 255, 0.45); }
