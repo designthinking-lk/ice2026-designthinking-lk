@@ -25,8 +25,10 @@
 
   var accessToken = null;
   var tokenExpiry = 0;
-  var meCache = null;                 // { id, email }
+  var meCache = null;                 // { id, email } — the account the token is for
+  var accountHint = '';              // the workshop email to authenticate Chat as
   var dmByEmail = {};                 // email(lower) -> spaceName | 'none' (cached miss)
+  var TOKEN_KEY = 'ice.chat.token';
 
   function configured() {
     return !!(C.CHAT_CLIENT_ID && window.google && google.accounts && google.accounts.oauth2);
@@ -37,19 +39,56 @@
   }
 
   // ------------------------------------------------------------------ token
-  // The consent popup must be spent inside a user gesture, so getAccessToken is
-  // only ever called from a click handler (the "Connect" button / pane open).
+  // The token (with the account it belongs to) is cached in localStorage so a
+  // page refresh reuses it directly — no GIS call, no popup flash — until it
+  // expires (~1h). It is bound to an email so a multi-account browser can never
+  // silently reuse a token issued for the wrong Google account.
 
-  var accountHint = '';   // the workshop email to authenticate Chat as
+  function persistToken() {
+    try {
+      localStorage.setItem(TOKEN_KEY, JSON.stringify({
+        t: accessToken, e: tokenExpiry,
+        id: meCache && meCache.id, email: meCache && meCache.email,
+      }));
+    } catch (e) { /* private mode */ }
+  }
+  function clearToken() {
+    accessToken = null; tokenExpiry = 0;
+    try { localStorage.removeItem(TOKEN_KEY); } catch (e) { /* ignore */ }
+  }
+  (function loadToken() {
+    try {
+      var s = JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null');
+      if (s && s.t && s.e && Date.now() < s.e - 60000) {
+        accessToken = s.t; tokenExpiry = s.e;
+        if (s.id || s.email) meCache = { id: String(s.id || ''), email: String(s.email || '') };
+      }
+    } catch (e) { /* ignore */ }
+  })();
 
   /** Tell the client which account to use — the person's @designthinking.lk
-   *  workshop account. Without this, a browser with multiple Google sessions
-   *  shows the account chooser on every (even silent) token request. */
-  function setAccount(email) { accountHint = String(email || '').toLowerCase(); }
+   *  workshop account. If the cached token is for a different account, drop it
+   *  so we re-auth as the right one (else Chat acts as the wrong identity). */
+  function setAccount(email) {
+    accountHint = String(email || '').toLowerCase();
+    if (accountHint && meCache && meCache.email && meCache.email !== accountHint) {
+      clearToken(); meCache = null;
+    }
+  }
+
+  async function fetchUserInfo(token) {
+    var res = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    if (!res.ok) return { id: '', email: '' };
+    var info = await res.json();
+    return { id: String(info.sub || ''), email: String(info.email || '').toLowerCase() };
+  }
 
   // opts.silent = true attempts a no-UI token renewal (prompt: '') — succeeds
   // without a popup when the user has already granted consent and still has an
-  // active Google session, so a page refresh doesn't force "Connect" again.
+  // active Google session. A fresh token is bound to its account (userinfo)
+  // and persisted before resolving.
   function getAccessToken(opts) {
     opts = opts || {};
     return new Promise(function (resolve, reject) {
@@ -62,7 +101,10 @@
           if (resp.error) return reject(new Error(resp.error_description || resp.error));
           accessToken = resp.access_token;
           tokenExpiry = Date.now() + (resp.expires_in || 3600) * 1000;
-          resolve(accessToken);
+          // bind the token to the account that was actually authorised
+          fetchUserInfo(accessToken).then(function (info) {
+            meCache = info; persistToken(); resolve(accessToken);
+          }, function () { persistToken(); resolve(accessToken); });
         },
         error_callback: function (err) {
           reject(new Error((err && err.message) || 'Google sign-in was closed'));
@@ -75,13 +117,18 @@
     });
   }
 
-  // Silent reconnect: resolves true if a token was obtained without any UI,
+  // Silent reconnect: resolves true if a usable token is available without any
+  // UI (a valid cached token for the right account, or a silent renewal),
   // false otherwise (caller then shows the Connect button). Never rejects.
   function reconnect() {
-    if (connected()) return Promise.resolve(true);
     if (!configured()) return Promise.resolve(false);
+    if (connected() && (!accountHint || (meCache && meCache.email === accountHint))) {
+      return Promise.resolve(true);   // reuse cached token — no GIS call, no flash
+    }
     return getAccessToken({ silent: true }).then(function () { return true; }, function () { return false; });
   }
+
+  function disconnect() { clearToken(); meCache = null; }
 
   // Low-level authed fetch. On 401 (token expired mid-session) it clears the
   // token so the next call re-prompts. Throws Error(message) on API errors.
@@ -95,7 +142,7 @@
       },
       body: body ? JSON.stringify(body) : undefined,
     });
-    if (res.status === 401) { accessToken = null; tokenExpiry = 0; }
+    if (res.status === 401) clearToken();
     var data = null;
     try { data = await res.json(); } catch (e) { data = null; }
     if (!res.ok) {
@@ -109,17 +156,12 @@
 
   // ------------------------------------------------------------------- identity
   /** The signed-in person's Chat identity: { id, email }. id is the numeric
-   *  users/{id} value, read from the OpenID userinfo `sub`. Cached per session
-   *  and in localStorage (it never changes for a given account). */
+   *  users/{id} value (OpenID sub); email is the account the token is for. */
   async function me() {
-    if (meCache) return meCache;
-    try {
-      var stored = JSON.parse(localStorage.getItem('ice.chat.me') || 'null');
-      if (stored && stored.id) { meCache = stored; return meCache; }
-    } catch (e) { /* ignore */ }
-    var info = await call('GET', 'https://openidconnect.googleapis.com/v1/userinfo');
-    meCache = { id: String(info.sub || ''), email: String(info.email || '').toLowerCase() };
-    try { localStorage.setItem('ice.chat.me', JSON.stringify(meCache)); } catch (e) { /* ignore */ }
+    if (meCache && meCache.id) return meCache;
+    var token = await getAccessToken();
+    meCache = await fetchUserInfo(token);
+    persistToken();
     return meCache;
   }
 
@@ -191,8 +233,10 @@
     configured: configured,
     connected: connected,
     setAccount: setAccount,    // pin which Google account to use (workshop email)
+    account: function () { return meCache ? meCache.email : ''; }, // account the token is for
     connect: getAccessToken,   // ensure a token from within a gesture
     reconnect: reconnect,      // silent, no-UI token renewal (returns bool)
+    disconnect: disconnect,    // drop the cached token
     me: me,
     findDm: findDm,
     ensureDm: ensureDm,

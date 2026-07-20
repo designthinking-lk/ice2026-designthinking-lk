@@ -462,10 +462,19 @@
   // Shared post-token setup for both the manual and silent connect paths.
   async function finishConnect() {
     var info = await window.IceChat.me();
+    var want = chatAccountHint();
+    // Guard against a multi-account browser handing back the wrong account —
+    // Chat would then act as the wrong identity (DMs fail / go to the wrong place).
+    if (want && info.email && info.email !== want) {
+      window.IceChat.disconnect();
+      chatConn.ready = false;
+      chatConn.err = 'Connected as ' + info.email + '. Please choose your workshop account (' + want + ').';
+      throw new Error(chatConn.err);
+    }
     chatConn.myId = info.id;
-    // A previously captured authoritative id (from a past send) wins over the
-    // OpenID sub, so message alignment is right even before sending this time.
-    try { var saved = localStorage.getItem('ice.chat.myid'); if (saved) chatConn.myId = saved; } catch (e) { /* private mode */ }
+    // A previously captured authoritative id (from a past send, keyed by
+    // account) wins over the OpenID sub, so alignment is right before sending.
+    try { var saved = localStorage.getItem('ice.chat.myid.' + info.email); if (saved) chatConn.myId = saved; } catch (e) { /* private mode */ }
     chatConn.ready = true;
     try { localStorage.setItem('ice.chat.granted', '1'); } catch (e) { /* private mode */ }
     startUnreadPoll();   // keep the fab badge live from here on
@@ -491,7 +500,8 @@
     window.IceChat.setAccount(chatAccountHint());
     var ok = await window.IceChat.reconnect();   // silent; false if it needs UI
     if (!ok) return;                             // leave the gate; manual Connect still works
-    await finishConnect();
+    try { await finishConnect(); }
+    catch (err) { chatConn.autoTried = false; return; } // wrong account etc. — show gate
     if (commTab === 'chat') renderChatPane();     // reflect the now-connected state
   }
 
@@ -751,7 +761,8 @@
       // future sessions align history correctly from the first render.
       if (msg.senderId) {
         chatConn.myId = msg.senderId;
-        try { localStorage.setItem('ice.chat.myid', msg.senderId); } catch (e) { /* private mode */ }
+        var acct = (window.IceChat.account && window.IceChat.account()) || '';
+        try { localStorage.setItem('ice.chat.myid.' + acct, msg.senderId); } catch (e) { /* private mode */ }
       }
       input.value = ''; chatUI.draft = ''; autoGrow(input);
       chatUI.msgs = (chatUI.msgs || []).concat([msg]);
@@ -764,7 +775,10 @@
       if (body) { body.innerHTML = convoHTML(); scrollConvoToBottom(); }
       input.focus();
     } catch (err) {
-      toast(err.message || 'Message not sent', true);
+      // Surface which account is sending — a "permission denied" here usually
+      // means Google Chat isn't enabled for that workshop account.
+      var acct = (window.IceChat.account && window.IceChat.account()) || '';
+      toast((err.message || 'Message not sent') + (acct ? ' (as ' + acct + ')' : ''), true);
     }
     busy(btn, false);
   }
