@@ -1319,6 +1319,9 @@ body.chat-open .chat-fab { display: none; }
 /* count / legend / tagline share the team chips' exact type: 13px / 600 */
 .topbar-count { font-size: 13px; font-weight: 600; color: var(--text-body); white-space: nowrap; }
 .topbar-tag { font-size: 13px; font-weight: 600; color: var(--text-body); white-space: nowrap; }
+/* the tense word (to be / being / were) rides the sentence at the same size,
+   set apart only by the brand accent so the shift in tense catches the eye */
+.tense { color: var(--color-accent-light); font-weight: 700; }
 .topbar-teams::-webkit-scrollbar { display: none; }
 .topbar-teams .hive-teams {
   position: static; display: flex; flex-wrap: nowrap; gap: 8px;

@@ -146,6 +146,28 @@
   function eventName() { return proj().name || C.EVENT_NAME; }
   function eventTagline() { return proj().tagline || C.EVENT_TAGLINE; }
   function siteUrl() { return proj().siteUrl || location.host; }
+
+  // Where the current workshop sits in time — 'before' | 'during' | 'after' —
+  // read off the project's start/end dates (local wall-clock, so it flips at
+  // the same moment for every viewer). No dates set → treat as done.
+  function workshopPhase() {
+    var p = proj();
+    var s = p.startDate, e = p.endDate || p.startDate;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s || '')) return 'after';
+    var n = new Date();
+    var today = n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') +
+      '-' + String(n.getDate()).padStart(2, '0');
+    return today < s ? 'before' : today > e ? 'after' : 'during';
+  }
+  // A tiny word that shifts with the workshop's tense, coloured apart from the
+  // sentence around it — e.g. tense('to be', 'being', 'were') so a line reads
+  // true whether the workshop is upcoming, live, or over.
+  function tense(before, during, after) {
+    var phase = workshopPhase();
+    var word = phase === 'before' ? before : phase === 'during' ? during : after;
+    return '<span class="tense">' + word + '</span>';
+  }
+
   // "ICE2026" renders as ICE + emphasised year wherever the brand is shown.
   function brandHtml(bold) {
     var m = String(eventName()).match(/^([A-Za-z]+)(\d+)$/);
@@ -312,7 +334,8 @@
           teamChipsHtml();
       } else if (isProjects) {
         var nT = homeTeams().length;
-        chips = '<span class="topbar-tag">' + DEMO_PROJECTS.length + ' amazing projects crafted in 3 days by ' +
+        chips = '<span class="topbar-tag">' + DEMO_PROJECTS.length + ' amazing projects ' +
+          tense('to be', 'being', 'were') + ' crafted in 3 days by ' +
           nT + ' amazing teams</span>';
       }
       if (tb.innerHTML !== chips) tb.innerHTML = chips;
@@ -2444,7 +2467,8 @@
 
   function viewTools() {
     if (!signedIn()) return signInGate('tools');
-    return '<div class="empty" style="margin-top:40px"><i class="fa-solid fa-toolbox"></i>Tools are coming soon.<br>Handy links and resources for the workshop will live here.</div>';
+    return '<div class="empty" style="margin-top:40px"><i class="fa-solid fa-toolbox"></i>Tools are coming soon.<br>Handy links and resources for the workshop ' +
+      tense('will live', 'live', 'lived') + ' here.</div>';
   }
 
   // --------------------------------------------------------------- about
@@ -2704,7 +2728,8 @@
     });
     var projHtml = projItems
       ? '<ul class="ss-projects">' + projItems + '</ul>'
-      : '<p class="ss-none">Projects show up here once teams start building.</p>';
+      : '<p class="ss-none">Projects ' + tense('will appear', 'appear', 'appeared') +
+        ' here once teams start building.</p>';
     side.innerHTML =
       '<h3 class="ss-title">' + esc(name) +
       (users.length ? '<span class="ss-count">' + users.length + '</span>' : '') + '</h3>' +
