@@ -27,8 +27,12 @@ button { font-family: inherit; }
 /* -------------------------------------------------------------------- topbar */
 .topbar {
   flex: none; display: flex; align-items: center; justify-content: flex-end;
-  gap: 10px; min-height: 60px; padding: 12px 24px;
-  background: var(--surface);
+  gap: 10px; min-height: 60px; padding: 12px 24px; z-index: 10;
+  /* frosted glass, same recipe as the #/about footer band — content passing
+     under it (e.g. the full-bleed People hive) reads softened, not crisp */
+  background: rgba(244, 247, 249, 0.55);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  backdrop-filter: blur(14px) saturate(120%);
 }
 .topbar-actions { display: flex; align-items: center; gap: 10px; }
 
@@ -1149,10 +1153,10 @@ body.chat-open .chat-toggle { background: var(--color-accent-light); border-colo
 /* Component tweaks the shared tokens don't cover: the active nav pill is
    near-black, which vanishes against dark surfaces. */
 :root[data-theme="dark"] .search:focus-within { box-shadow: 0 0 0 3px rgba(144, 77, 255, 0.18); }
-/* app bar + side pane blend seamlessly into the page background at night
-   (in day mode they're all white already) */
-:root[data-theme="dark"] .topbar,
+/* side pane blends seamlessly into the page background at night; the app bar
+   keeps its frosted glass (dark tint) so it stays consistent with the footer */
 :root[data-theme="dark"] .sidebar { background: var(--bg); }
+:root[data-theme="dark"] .topbar { background: rgba(18, 19, 22, 0.5); }
 
 /* ------------------------------------------------- chat & broadcasts pane */
 /* Floating chat button, bottom-right corner (news lives in its Broadcast tab) */
@@ -1703,6 +1707,8 @@ body:has(.site-credit:not([hidden])) .view { padding-bottom: 84px; }
    their content floats above; the nav's octagon turns glassy for legibility.
    (Kept last so it outranks the night-mode surface rules above.) */
 body.landing-bg .sidebar, body.landing-bg .topbar { background: transparent; }
+/* the app bar's frosted blur would smear the video's top edge — drop it here */
+body.landing-bg .topbar { -webkit-backdrop-filter: none; backdrop-filter: none; }
 /* nothing scrolls on the landing — a solid footer band would hard-cut the
    video's bottom fade, so it goes clear here like the rest of the chrome */
 body.landing-bg .site-credit { background: transparent; }
