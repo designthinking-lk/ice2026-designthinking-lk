@@ -3353,9 +3353,12 @@
       '</div></div>';
   }
 
-  // Which admin tab is showing; People is home. (Storage links live inside
+  // Which admin tab is showing; the last-used tab is remembered per project so
+  // returning to Admin reopens the view you left. (Storage links live inside
   // each project row — no separate Resources tab.)
+  function adminTabKey() { return 'ice.admintab.' + A.getProject(); }
   var adminTab = 'people';
+  try { var savedTab = localStorage.getItem(adminTabKey()); if (savedTab) adminTab = savedTab; } catch (e) { /* private mode */ }
 
   // Teams tab interaction state (module-level so it survives route() re-renders).
   var teamSel = {};        // userId -> true : multi-selected people in the pool
@@ -3850,7 +3853,11 @@
       case 'new-project': showNewProject = true; route(); break;
       case 'cancel-new-project': showNewProject = false; route(); break;
       case 'switch-project-btn': switchProject(t.getAttribute('data-proj')); break;
-      case 'admin-tab': adminTab = t.getAttribute('data-tab'); route(); break;
+      case 'admin-tab':
+        adminTab = t.getAttribute('data-tab');
+        try { localStorage.setItem(adminTabKey(), adminTab); } catch (e) { /* private mode */ }
+        route();
+        break;
       case 'tb-toggle-select': {
         if (teamBusy) break;
         if (teamSel[id]) delete teamSel[id]; else teamSel[id] = true;
