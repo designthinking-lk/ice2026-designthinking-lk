@@ -1351,6 +1351,19 @@
     return v;
   }
 
+  // A bare handle in the GitHub / LinkedIn field ("sankha" or "@sankha")
+  // completes to the full profile URL before checking, validating and saving.
+  var LINK_PREFIX = { linkGithub: 'github.com/', linkLinkedin: 'linkedin.com/in/' };
+  function completeLink(field, v) {
+    v = String(v || '').trim();
+    var pre = LINK_PREFIX[field];
+    if (!pre || !v) return v;
+    var handle = v.replace(/^@/, '');
+    // anything with a dot, slash or space is already URL-ish — leave it alone
+    if (/[/.\s]/.test(handle)) return v;
+    return pre + handle;
+  }
+
   function validateProfile(form) {
     var fd = new FormData(form);
     if (!String(fd.get('firstName') || '').trim()) return 'Please enter your first name.';
@@ -1360,7 +1373,7 @@
       ['linkLinkedin', /(^|\.)linkedin\.com$/i, 'LinkedIn'],
     ];
     for (var i = 0; i < linkRules.length; i++) {
-      var v = normUrl(fd.get(linkRules[i][0]));
+      var v = normUrl(completeLink(linkRules[i][0], fd.get(linkRules[i][0])));
       if (!v) continue;
       var host = '';
       try { host = new URL(v).hostname; } catch (e) { /* invalid */ }
@@ -1779,7 +1792,7 @@
   }
 
   function checkLink(field, rawValue) {
-    var v = normUrl(rawValue);
+    var v = normUrl(completeLink(field, rawValue));
     if (!v) { setLinkStatus(field, 'empty'); return; }
     setLinkStatus(field, 'checking');
     var seq = (linkSeq[field] = (linkSeq[field] || 0) + 1);
@@ -1803,6 +1816,16 @@
         linkTimers[f] = setTimeout(function () {
           if (input.value.trim()) checkLink(f, input.value); else setLinkStatus(f, 'empty');
         }, 600);
+      });
+      // a bare handle materialises as the full URL once the user leaves the
+      // field, so the card shows exactly what will be saved
+      input.addEventListener('blur', function () {
+        var full = completeLink(f, input.value);
+        if (full !== input.value.trim()) {
+          input.value = full;
+          checkLink(f, full);
+          saveRegDraft();
+        }
       });
     });
   }
@@ -3031,9 +3054,9 @@
   function collectProfile(form) {
     var fd = new FormData(form);
     var links = [
-      normUrl(fd.get('linkGithub')),
+      normUrl(completeLink('linkGithub', fd.get('linkGithub'))),
       normUrl(fd.get('linkWebsite')),
-      normUrl(fd.get('linkLinkedin')),
+      normUrl(completeLink('linkLinkedin', fd.get('linkLinkedin'))),
     ].filter(Boolean);
     var ytIn = $('#ytInput');
     var video = fd.get('video') || (ytIn && ytId(ytIn.value) ? 'https://youtu.be/' + ytId(ytIn.value) : '');
