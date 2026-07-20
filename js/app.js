@@ -1753,10 +1753,14 @@
     // instead of a dead form. Only freshly loaded data decides — a cached
     // pre-invite bootstrap lacks the invite field.
     if (state.loaded && state.data && !state.data.invite && !state.data.isAdmin) {
+      var isWorkAddr = /@designthinking\.lk$/i.test(state.data.email || '');
       return '<div class="empty" style="margin-top:40px"><i class="fa-regular fa-envelope"></i>' +
         esc(eventName()) + ' is invite-only.' +
         (state.data.email
-          ? '<br>You are signed in as <b>' + esc(state.data.email) + '</b>. If your invitation went to a different address, sign out and use that Google account — otherwise ask the organizers to invite you.'
+          ? '<br>You are signed in as <b>' + esc(state.data.email) + '</b>. ' +
+            (isWorkAddr
+              ? 'This workshop account isn’t linked to a registration yet — sign in with the personal Google account your invitation was sent to, then this account will work too.'
+              : 'If your invitation went to a different address, sign out and use that Google account — otherwise ask the organizers to invite you.')
           : '<br>Ask the organizers for an invitation, then sign in with the invited Google account.') +
         '</div>';
     }
