@@ -40,6 +40,13 @@
   // The consent popup must be spent inside a user gesture, so getAccessToken is
   // only ever called from a click handler (the "Connect" button / pane open).
 
+  var accountHint = '';   // the workshop email to authenticate Chat as
+
+  /** Tell the client which account to use — the person's @designthinking.lk
+   *  workshop account. Without this, a browser with multiple Google sessions
+   *  shows the account chooser on every (even silent) token request. */
+  function setAccount(email) { accountHint = String(email || '').toLowerCase(); }
+
   // opts.silent = true attempts a no-UI token renewal (prompt: '') — succeeds
   // without a popup when the user has already granted consent and still has an
   // active Google session, so a page refresh doesn't force "Connect" again.
@@ -48,7 +55,7 @@
     return new Promise(function (resolve, reject) {
       if (connected()) return resolve(accessToken);
       if (!configured()) return reject(new Error('Google Chat is not set up yet — contact the organizers.'));
-      var client = google.accounts.oauth2.initTokenClient({
+      var cfg = {
         client_id: C.CHAT_CLIENT_ID,
         scope: SCOPE,
         callback: function (resp) {
@@ -60,7 +67,10 @@
         error_callback: function (err) {
           reject(new Error((err && err.message) || 'Google sign-in was closed'));
         },
-      });
+      };
+      // hint pins the account so silent renewal doesn't fall back to the chooser
+      if (accountHint) cfg.hint = accountHint;
+      var client = google.accounts.oauth2.initTokenClient(cfg);
       client.requestAccessToken(opts.silent ? { prompt: '' } : {});
     });
   }
@@ -180,6 +190,7 @@
   window.IceChat = {
     configured: configured,
     connected: connected,
+    setAccount: setAccount,    // pin which Google account to use (workshop email)
     connect: getAccessToken,   // ensure a token from within a gesture
     reconnect: reconnect,      // silent, no-UI token renewal (returns bool)
     me: me,

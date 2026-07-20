@@ -439,10 +439,15 @@
 
   // Acquire an OAuth token + the caller's Chat id. MUST be called from a user
   // gesture (the consent popup needs one). Idempotent once connected.
+  // The workshop @designthinking.lk account is the one to message from — pin it
+  // so a multi-account browser doesn't show the chooser on silent renewals.
+  function chatAccountHint() { var u = me(); return u ? (u.workEmail || u.email || '') : ''; }
+
   async function chatConnect() {
     if (chatConn.ready) return true;
     chatConn.connecting = true; chatConn.err = '';
     try {
+      window.IceChat.setAccount(chatAccountHint());
       await window.IceChat.connect();   // may show the Google popup
       await finishConnect();
       return true;
@@ -483,6 +488,7 @@
       return;
     }
     chatConn.autoTried = true;
+    window.IceChat.setAccount(chatAccountHint());
     var ok = await window.IceChat.reconnect();   // silent; false if it needs UI
     if (!ok) return;                             // leave the gate; manual Connect still works
     await finishConnect();
