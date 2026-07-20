@@ -38,13 +38,15 @@ button { font-family: inherit; }
    hard line. Sits above scrolling/hive content (z 4) but below the topbar
    controls (z 10) and the animated brand (z 70), so both stay crisp on top. */
 .shell::before {
-  content: ""; position: fixed; top: 0; left: 0; right: 0; height: 76px;
+  content: ""; position: fixed; top: 0; left: 0; right: 0; height: 104px;
   z-index: 4; pointer-events: none;
   background: rgba(244, 247, 249, 0.55);
   -webkit-backdrop-filter: blur(14px) saturate(120%);
   backdrop-filter: blur(14px) saturate(120%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
-  mask-image: linear-gradient(to bottom, #000 55%, transparent);
+  /* long, gradual fade on the lower edge — solid only across the top third,
+     then eased out to nothing so there's no hard line (matches the footer) */
+  -webkit-mask-image: linear-gradient(to bottom, #000 35%, rgba(0,0,0,0.5) 62%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 35%, rgba(0,0,0,0.5) 62%, transparent 100%);
 }
 :root[data-theme="dark"] .shell::before { background: rgba(18, 19, 22, 0.5); }
 .topbar-actions { display: flex; align-items: center; gap: 10px; }
@@ -87,7 +89,11 @@ button { font-family: inherit; }
   background: var(--bg-subtle);
 }
 /* real content paints above the octagon */
-.sidebar-top, .project-switcher, .nav { position: relative; z-index: 1; }
+.project-switcher, .nav { position: relative; z-index: 1; }
+/* sidebar-top holds the fixed animated brand; its z-index is the stacking
+   context the brand lives in, so it must clear the frosted app-bar band (z 4)
+   and topbar (z 10) — otherwise the ICE letters paint behind the glass. */
+.sidebar-top { position: relative; z-index: 71; }
 
 .sidebar-top { display: flex; align-items: center; padding: 0 6px; flex: none; }
 /* The brand escapes the sidebar's overflow clip (position: fixed, no
