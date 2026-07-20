@@ -1417,7 +1417,7 @@
       '</div></div>' +
       '<div class="idcard-fields">' +
       '<div class="cname-row">' +
-      '<span class="cgender" id="cgender"></span>' +
+      '<span class="cgender"><i class="fa-solid fa-user"></i></span>' +
       '<input class="cinput cname" name="firstName" required maxlength="50" placeholder="First name" value="' + esc(firstName) + '">' +
       '<input class="cinput cname" name="lastName" maxlength="50" placeholder="Last name" value="' + esc(lastName) + '">' +
       '</div>' +
@@ -1648,27 +1648,6 @@
   function closeSkills() {
     var ov = $('#skillOverlay');
     if (ov) ov.hidden = true;
-  }
-
-  // ---- gender picker on the name line (round M / F badge) ----
-  function genderLetter(g) { return g === 'Female' ? 'F' : 'M'; }
-
-  function renderGender() {
-    var box = $('#cgender');
-    if (!box) return;
-    var hid = $('#profileForm [name="gender"]');
-    var val = hid ? hid.value : '';
-    var isMF = (val === 'Male' || val === 'Female');
-    var open = box.getAttribute('data-open') === '1';
-    if (isMF && !open) {
-      // collapsed: just the chosen letter; click to reselect
-      box.innerHTML = '<button type="button" class="cg-btn selected" data-action="gender-toggle" title="' + esc(val) + ' — tap to change">' + genderLetter(val) + '</button>';
-    } else {
-      // expanded: both options
-      box.innerHTML =
-        '<button type="button" class="cg-btn' + (val === 'Male' ? ' on' : '') + '" data-action="gender-pick" data-gender="Male" title="Male">M</button>' +
-        '<button type="button" class="cg-btn' + (val === 'Female' ? ' on' : '') + '" data-action="gender-pick" data-gender="Female" title="Female">F</button>';
-    }
   }
 
   // ---- registration draft autosave (localStorage) ----
@@ -1929,7 +1908,6 @@
     photoEd = null; // fresh form; only set when the user picks a new photo
     linkStatus = {}; linkTimers = {}; linkSeq = {}; emailSeq = 0;
     refreshSkillsUI();
-    renderGender();
     var pform = $('#profileForm');
     if (pform) {
       wireLinkChecks(pform); // verify links + show ✓/⚠ (both new and edit forms)
@@ -3332,14 +3310,6 @@
       case 'rm-tag': e.preventDefault(); t.closest('[data-skill]').remove(); refreshSkillsUI(); saveRegDraft(); updateJoinState(); schedulePersona(); break;
       case 'open-skills': openSkills(); break;
       case 'close-skills': closeSkills(); break;
-      case 'gender-toggle': { var gb = $('#cgender'); if (gb) { gb.setAttribute('data-open', '1'); renderGender(); } break; }
-      case 'gender-pick': {
-        var hid = $('#profileForm [name="gender"]');
-        if (hid) hid.value = t.getAttribute('data-gender') || '';
-        var gbx = $('#cgender'); if (gbx) gbx.setAttribute('data-open', '0');
-        renderGender(); saveRegDraft();
-        break;
-      }
       case 'add-typed-skill': { var si3 = $('#skillInput'); if (si3) { addTag(si3.value); si3.value = ''; si3.focus(); } break; }
       case 'new-project': showNewProject = true; route(); break;
       case 'cancel-new-project': showNewProject = false; route(); break;
