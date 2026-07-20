@@ -1262,9 +1262,13 @@
   }
 
   // ---- intro video as the card backdrop ----
-  // The video fills the card above the footer row (~16:9 there), autoplaying
-  // muted on loop at reduced opacity so the card gradient tints through.
-  // A footer speaker button unmutes via the YouTube iframe postMessage API.
+  // The video fills the card above the footer row (~16:9 there), on loop at
+  // reduced opacity so the card gradient tints through. When the member has
+  // no intro video the default backdrop plays instead — it is display-only
+  // and never written into the form's video field. Playback starts muted
+  // (autoplay policy), then unmutes as soon as the player is ready; the
+  // footer speaker button toggles via the YouTube iframe postMessage API.
+  var DEFAULT_CARD_VIDEO = 'TeaZL3LJ7ME';
   var cardVideoMuted = true;
 
   function cardVideoFrame(id) {
@@ -1279,25 +1283,29 @@
     var box = $('#cardVideo');
     if (!box) return;
     var hid = $('#profileForm [name="video"]');
-    var id = ytId(hid && hid.value);
+    var own = ytId(hid && hid.value);
+    var id = own || DEFAULT_CARD_VIDEO; // fallback backdrop, never saved
     var muteBtn = $('#cardMuteBtn');
     var label = $('#cardVideoLabel');
-    if (!id) {
-      box.innerHTML = '';
-      box.removeAttribute('data-vid');
-      if (muteBtn) muteBtn.hidden = true;
-      if (label) label.textContent = 'Add video';
-      return;
-    }
-    if (label) label.textContent = '';
+    if (label) label.textContent = own ? '' : 'Add video';
     if (muteBtn) muteBtn.hidden = false;
     // only rebuild the iframe when the video actually changed, so re-renders
     // don't restart playback
     if (box.getAttribute('data-vid') !== id) {
       box.setAttribute('data-vid', id);
       box.innerHTML = cardVideoFrame(id);
-      cardVideoMuted = true;
+      // sound on by default: the embed must start muted to be allowed to
+      // autoplay, so unmute through the API once the player has loaded
+      cardVideoMuted = false;
       setCardMuteIcon();
+      var f = $('#cardVideoIf');
+      if (f) f.addEventListener('load', function () {
+        setTimeout(function () {
+          if (cardVideoMuted) return; // user hit mute before the player woke up
+          cardVideoCmd('unMute');
+          cardVideoCmd('playVideo');
+        }, 700);
+      });
     }
   }
 
@@ -1418,8 +1426,8 @@
       '<div class="idcard-fields">' +
       '<div class="cname-row">' +
       '<span class="cgender"><i class="fa-solid fa-user"></i></span>' +
-      '<input class="cinput cname" name="firstName" required maxlength="50" placeholder="First name" value="' + esc(firstName) + '">' +
-      '<input class="cinput cname" name="lastName" maxlength="50" placeholder="Last name" value="' + esc(lastName) + '">' +
+      '<input class="cinput cname" name="firstName" required maxlength="25" placeholder="First name" value="' + esc(firstName) + '">' +
+      '<input class="cinput cname" name="lastName" maxlength="25" placeholder="Last name" value="' + esc(lastName) + '">' +
       '</div>' +
       '<input type="hidden" name="gender" value="' + esc(gender) + '">' +
       // registration: live-proposed handle (hidden until a name is typed);
@@ -1428,7 +1436,7 @@
       '<i class="fa-regular fa-envelope"></i>' +
       '<span class="cemail-addr" id="cemailAddr">' + esc(!isNew && u.workEmail ? u.workEmail : '') + '</span>' +
       '<span class="cemail-status" id="cemailStatus" data-status=""></span></div>' +
-      '<label class="cfield"><i class="fa-solid fa-building"></i><input class="cinput" name="affiliation" maxlength="70" placeholder="Affiliation — university, company" value="' + esc(u.affiliation || '') + '"></label>' +
+      '<label class="cfield"><i class="fa-solid fa-building"></i><input class="cinput" name="affiliation" maxlength="45" placeholder="Affiliation — university, company" value="' + esc(u.affiliation || '') + '"></label>' +
       '<label class="cfield"><i class="fa-solid fa-lightbulb"></i><input class="cinput" name="expertise" maxlength="90" placeholder="Expertise — comma separated topics" value="' + esc(u.expertise || '') + '"></label>' +
       '</div></div>' + // close .idcard-fields + .idcard-main
       // skills attach directly on the card front (max 3, one line)
@@ -1836,8 +1844,26 @@
     return nameMeasureEl.getBoundingClientRect().width;
   }
   function sizeName(input) {
-    // +2px leaves room for the caret on focus without visibly widening the text.
-    input.style.width = Math.ceil(measureNameWidth(input) + 2) + 'px';
+    input.style.fontSize = ''; // measure at full size first
+    // The input is border-box: its padding + border change between the rest
+    // and focused states, so they must be added to the measured text width —
+    // otherwise the last letter crops whenever the field is focused.
+    var cs = getComputedStyle(input);
+    var chrome = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) +
+      (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0) +
+      3; // caret room on focus
+    // Each name may grow to half the row (minus the leading icon slot) so
+    // first + last always fit side by side; past that the text shrinks.
+    var row = input.closest('.cname-row');
+    var cap = row ? Math.max(70, Math.floor((row.clientWidth - 34) / 2) - 4) : 0;
+    var w = measureNameWidth(input) + chrome;
+    if (cap && w > cap) {
+      var base = parseFloat(cs.fontSize) || 18;
+      var size = Math.max(11, base * (cap - chrome) / (w - chrome));
+      input.style.fontSize = size.toFixed(1) + 'px';
+      w = Math.min(cap, measureNameWidth(input) + chrome);
+    }
+    input.style.width = Math.ceil(w) + 'px';
   }
 
   // ---- proposed workshop email (firstname@designthinking.lk), checked live ----
@@ -1918,6 +1944,9 @@
       nameInputs.forEach(function (inp) {
         sizeName(inp);
         inp.addEventListener('input', function () { sizeName(inp); });
+        // padding/border differ between rest and focus — re-measure on both
+        inp.addEventListener('focus', function () { sizeName(inp); });
+        inp.addEventListener('blur', function () { sizeName(inp); });
       });
       // Re-measure once the display font loads (initial measure may hit the fallback).
       if (document.fonts && document.fonts.ready) {
@@ -3559,7 +3588,11 @@
     // Keep presence dots + broadcasts fresh (and mark ourselves online)
     // while the tab is visible. 2 min < the backend's 5-min online window.
     setInterval(function () {
-      if (document.visibilityState === 'visible' && signedIn()) refresh();
+      if (document.visibilityState !== 'visible' || !signedIn()) return;
+      // Never rebuild the view while a card is being edited — route() would
+      // wipe the not-yet-saved photo preview and un-flip the card.
+      if ($('#profileForm')) return;
+      refresh();
     }, 120000);
   })();
 })();
