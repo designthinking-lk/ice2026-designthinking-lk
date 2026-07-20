@@ -3199,12 +3199,18 @@
   // participant/mentor chip plays that role; admin-only people sit out).
   function teamAssignable(u) { return hasRoleU(u, 'participant') || hasRoleU(u, 'mentor'); }
 
-  // Compact display name for the tight 2-column team cards:
-  // "Sankha Cooray" -> "Sankha C" (full name stays in the tooltip).
-  function shortName(name) {
-    var parts = String(name || '').trim().split(/\s+/);
-    if (parts.length < 2) return parts[0] || '';
-    return parts[0] + ' ' + parts[parts.length - 1].charAt(0).toUpperCase();
+  // IDs of assignable people not on any Team A–F — the current unassigned pool.
+  // Used by the header's master select (render recomputes the same set).
+  function unassignedPoolIds() {
+    var d = state.data;
+    if (!d) return [];
+    var inTeam = {};
+    (d.teams || []).forEach(function (t) {
+      if (!/^team [a-f]$/i.test(String(t.name || '').trim())) return;
+      (t.members || []).forEach(function (id) { inTeam[id] = true; });
+    });
+    return (d.users || []).filter(function (u) { return teamAssignable(u) && !inTeam[u.id]; })
+      .map(function (u) { return u.id; });
   }
 
   function adminTeamsSection(d) {
@@ -3234,11 +3240,11 @@
       });
     });
 
-    // A mentor's pill is replaced by a tie icon here — the 2-column cells are
-    // too narrow for both a name and a tag.
+    // Slots stack one-per-row now, so the full name fits (a mentor keeps the
+    // compact tie icon rather than a wider pill).
     function memberRow(u, L) {
       return '<div class="tb-member">' + avatar(u, 'avatar-sm') +
-        '<a href="#/profile/' + esc(u.id) + '" title="' + esc(u.name) + '">' + esc(shortName(u.name)) + '</a>' +
+        '<a href="#/profile/' + esc(u.id) + '" title="' + esc(u.name) + '">' + esc(u.name) + '</a>' +
         (teamSlot(u) === 'mentor' ? '<i class="fa-solid fa-user-tie tb-tie" title="mentor"></i>' : '') +
         '<button class="tb-remove" type="button" data-action="unassign-team" data-id="' + esc(u.id) + '"' +
         (teamBusy ? ' disabled' : '') + ' title="Remove from Team ' + L + '"><i class="fa-solid fa-xmark"></i></button></div>';
@@ -3287,23 +3293,23 @@
     }).join('');
 
     // Each pool person: a checkbox+name that toggles selection, plus a "T?"
-    // quick-assign that pops the six team buttons above the row.
+    // quick-assign. With 0/1 selected the six team buttons replace the name
+    // inline (same row, no extra height); with 2+ selected use "Add Here".
     var poolRows = pool.map(function (u) {
       var st = teamSlot(u);
       var sel = !!teamSel[u.id];
-      var quick = '';
-      if (teamQuick === u.id) {
-        quick = '<div class="tb-quickbar">' + TEAM_LETTERS.map(function (L) {
-          var isFull = counts[L][st] >= TEAM_CAP[st];
-          return '<button type="button" class="tb-qletter" data-action="assign-team" data-id="' + esc(u.id) + '" data-team="' + L + '"' +
-            ((isFull || teamBusy) ? ' disabled title="Team ' + L + ' has no free ' + st + ' slot"' : ' title="Assign to Team ' + L + '"') + '>' + L + '</button>';
-        }).join('') +
-          '<button type="button" class="tb-qclose" data-action="tb-quick-close" title="Close"><i class="fa-solid fa-xmark"></i></button></div>';
-      }
-      // "T?" is only for single/zero select — with 2+ picked, use "Add Here".
       var tDisabled = teamBusy || selCount > 1;
-      return '<div class="tb-prow' + (sel ? ' selected' : '') + '">' + quick +
-        '<div class="tb-prow-row">' +
+      var inner;
+      if (teamQuick === u.id) {
+        inner = avatar(u, 'avatar-sm') +
+          '<div class="tb-quickrow">' + TEAM_LETTERS.map(function (L) {
+            var isFull = counts[L][st] >= TEAM_CAP[st];
+            return '<button type="button" class="tb-qletter" data-action="assign-team" data-id="' + esc(u.id) + '" data-team="' + L + '"' +
+              ((isFull || teamBusy) ? ' disabled title="Team ' + L + ' has no free ' + st + ' slot"' : ' title="Assign to Team ' + L + '"') + '>' + L + '</button>';
+          }).join('') + '</div>' +
+          '<button type="button" class="tb-qclose" data-action="tb-quick-close" title="Close"><i class="fa-solid fa-xmark"></i></button>';
+      } else {
+        inner =
           '<div class="tb-prow-main" data-action="tb-toggle-select" data-id="' + esc(u.id) + '">' +
             '<span class="tb-check' + (sel ? ' on' : '') + '"><i class="fa-solid fa-check"></i></span>' +
             avatar(u, 'avatar-sm') +
@@ -3311,21 +3317,36 @@
             (st === 'mentor' ? '<span class="tb-tag">mentor</span>' : '') +
           '</div>' +
           '<button type="button" class="tb-qtoggle" data-action="tb-quick" data-id="' + esc(u.id) + '"' +
-            (tDisabled ? ' disabled' : '') + ' title="Quick assign to a team">T?</button>' +
-        '</div></div>';
+            (tDisabled ? ' disabled' : '') + ' title="Quick assign to a team">T?</button>';
+      }
+      return '<div class="tb-prow' + (sel ? ' selected' : '') + '">' +
+        '<div class="tb-prow-row' + (teamQuick === u.id ? ' tb-quickactive' : '') + '">' + inner + '</div></div>';
     }).join('');
 
+    // No unassigned people → drop the left column entirely and let the six
+    // team cards fill the full width (the original three-column view).
+    if (!pool.length) {
+      return '<div class="teamboard"><div class="tb-teams tb-teams-full">' + cards + '</div></div>';
+    }
+
+    // Master select: unchecked / star (some) / checked (all); click flips
+    // between select-all and select-none.
+    var allSel = selCount > 0 && selCount === pool.length;
+    var someSel = selCount > 0 && !allSel;
+    var masterIcon = allSel ? '<i class="fa-solid fa-square-check"></i>'
+      : someSel ? '<i class="fa-solid fa-star"></i>' : '<i class="fa-regular fa-square"></i>';
     var assignedCount = Object.keys(assigned).length;
     var assignable = users.filter(teamAssignable).length;
     return '<div class="teamboard"><div class="tb-layout">' +
       '<div class="tb-unassigned panel">' +
-        '<div class="tb-uhead"><h3><i class="fa-solid fa-user-plus"></i>Unassigned</h3>' +
-        (teamBusy ? '<span class="tb-spin"><i class="fa-solid fa-spinner fa-spin"></i></span>' : '') +
-        '<span class="tb-progress">' + assignedCount + ' / ' + assignable + '</span></div>' +
-        (selCount ? '<div class="tb-selbar"><span>' + selCount + ' selected</span>' +
-          '<button type="button" class="tb-clearsel" data-action="tb-clear-sel"' + (teamBusy ? ' disabled' : '') + '>Clear</button></div>' : '') +
-        (pool.length ? '<div class="tb-pool">' + poolRows + '</div>'
-                     : '<p class="tb-done"><i class="fa-solid fa-circle-check"></i> Everyone is on a team.</p>') +
+        '<div class="tb-uhead">' +
+          '<button type="button" class="tb-master' + (someSel ? ' some' : '') + '" data-action="tb-select-all-toggle"' +
+            (teamBusy ? ' disabled' : '') + ' title="Select all / none">' + masterIcon + '</button>' +
+          '<h3><i class="fa-solid fa-user-plus"></i>Unassigned</h3>' +
+          (teamBusy ? '<span class="tb-spin"><i class="fa-solid fa-spinner fa-spin"></i></span>' : '') +
+          '<span class="tb-progress">' + assignedCount + ' / ' + assignable + '</span>' +
+        '</div>' +
+        '<div class="tb-pool">' + poolRows + '</div>' +
       '</div>' +
       '<div class="tb-teams">' + cards + '</div>' +
       '</div></div>';
@@ -3837,7 +3858,16 @@
         route();
         break;
       }
-      case 'tb-clear-sel': { teamSel = {}; route(); break; }
+      case 'tb-select-all-toggle': {
+        if (teamBusy) break;
+        var poolAll = unassignedPoolIds();
+        var everyOn = poolAll.length && poolAll.every(function (pid) { return teamSel[pid]; });
+        teamSel = {};
+        if (!everyOn) poolAll.forEach(function (pid) { teamSel[pid] = true; });
+        teamQuick = null; clearTimeout(teamQuickTimer);
+        route();
+        break;
+      }
       case 'tb-quick': {
         if (teamBusy) break;
         teamQuick = (teamQuick === id) ? null : id;
