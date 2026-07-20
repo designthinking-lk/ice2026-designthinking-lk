@@ -1408,19 +1408,75 @@ body.hive-full .project-switcher select { pointer-events: auto; }
 .admin-tabview { flex: 1; min-height: 0; overflow-y: auto; padding-top: 8px; }
 
 /* admin Teams tab — assignment board (unassigned pool + Team A–F cards) */
-.teamboard { display: flex; flex-direction: column; gap: 18px; padding-bottom: 8px; }
+.teamboard { padding-bottom: 8px; }
+/* Unassigned as a tall left column; the six team cards fill three columns to
+   its right — one + three = four columns across the same area. */
+.tb-layout { display: grid; grid-template-columns: minmax(230px, 300px) 1fr; gap: 16px; align-items: start; }
+.tb-unassigned { display: flex; flex-direction: column; min-height: 0; max-height: calc(100vh - 200px); padding: 14px 14px 8px; }
+.tb-uhead { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.tb-uhead h3 { margin: 0; display: flex; align-items: center; gap: 8px; }
+.tb-spin { color: var(--color-accent); font-size: 13px; }
 .tb-progress { margin-left: auto; font-weight: 400; font-size: 13px; color: var(--text-muted); }
-.tb-pool { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; }
+.tb-selbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 12.5px; font-weight: 600; color: var(--color-accent);
+  background: rgba(97, 0, 255, 0.07); border-radius: var(--radius-sm);
+  padding: 5px 10px; margin-bottom: 6px;
+}
+.tb-clearsel { border: none; background: none; cursor: pointer; color: var(--text-muted); font-size: 12px; font-weight: 600; padding: 2px 6px; border-radius: var(--radius-sm); }
+.tb-clearsel:hover:not(:disabled) { color: var(--text); background: var(--surface-2, rgba(0,0,0,.05)); }
 .tb-done { margin: 0; color: var(--text-muted); font-size: 14px; }
 .tb-done i { color: #188038; margin-right: 6px; }
-.tb-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-.tb-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px 16px; }
+/* the scrollable participant list */
+.tb-pool { overflow-y: auto; display: flex; flex-direction: column; gap: 1px; margin: 0 -6px; padding: 0 2px 4px; }
+.tb-prow { border-radius: var(--radius-sm); }
+.tb-prow-row { display: flex; align-items: center; gap: 4px; }
+.tb-prow-main {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
+  padding: 4px 6px; cursor: pointer; border-radius: var(--radius-sm); user-select: none;
+}
+.tb-prow-main:hover { background: var(--surface-2, rgba(97, 0, 255, 0.05)); }
+.tb-prow.selected .tb-prow-main { background: rgba(97, 0, 255, 0.11); }
+.tb-check {
+  flex: none; width: 17px; height: 17px; border: 1.5px solid var(--border-strong);
+  border-radius: 5px; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; color: transparent; transition: background .1s, border-color .1s;
+}
+.tb-check.on { background: var(--color-accent); border-color: transparent; color: #fff; }
+.tb-pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
+.tb-qtoggle {
+  flex: none; border: 1px solid var(--border-strong); background: var(--surface);
+  color: var(--text-muted); font-size: 11.5px; font-weight: 700; cursor: pointer;
+  border-radius: var(--radius-sm); padding: 3px 7px;
+}
+.tb-qtoggle:hover:not(:disabled) { background: var(--gradient-brand); color: #fff; border-color: transparent; }
+.tb-qtoggle:disabled { opacity: 0.3; cursor: not-allowed; }
+/* the "T?" popup: six team buttons above the person's row */
+.tb-quickbar {
+  display: flex; flex-wrap: wrap; gap: 3px; padding: 4px; margin: 2px 4px 1px;
+  background: var(--surface-2, rgba(97, 0, 255, 0.06)); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); animation: tbPop .16s ease;
+}
+.tb-qletter {
+  width: 24px; height: 24px; border-radius: var(--radius-sm); cursor: pointer;
+  border: 1px solid var(--border-strong); background: var(--surface);
+  font-size: 12px; font-weight: 700; color: var(--text);
+}
+.tb-qletter:hover:not(:disabled) { background: var(--gradient-brand); color: #fff; border-color: transparent; }
+.tb-qletter:disabled { opacity: 0.3; cursor: not-allowed; }
+.tb-qclose { margin-left: auto; border: none; background: none; cursor: pointer; color: var(--text-faint); padding: 2px 5px; border-radius: var(--radius-sm); }
+.tb-qclose:hover { color: #C0392B; }
+@keyframes tbPop { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+/* team cards */
+.tb-teams { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-content: start; }
+.tb-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px; }
+.tb-card.tb-full { border-color: rgba(24, 128, 56, 0.5); }
+.tb-card.tb-target { border-color: var(--color-accent); box-shadow: 0 0 0 1px var(--color-accent); }
 .tb-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
 .tb-head h3 { margin: 0; font-size: 15.5px; }
-.tb-counts { color: var(--text-muted); font-size: 12.5px; white-space: nowrap; }
-.tb-counts.full { color: #188038; }
-.tb-counts i { font-size: 11px; }
-/* card slots: 2-column grid — the 7 slots land in 4 rows (mentors on top) */
+.tb-fulltag { color: #188038; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+/* card slots: 2-column grid — the 7 slots land in 4 rows (mentors on top);
+   the empty 8th cell (row 4, col 2) is where "Add Here" appears */
 .tb-slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 12px; }
 .tb-member { display: flex; align-items: center; gap: 7px; padding: 2px 0; font-size: 13.5px; min-height: 30px; min-width: 0; }
 .tb-member > a { color: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1438,18 +1494,25 @@ body.hive-full .project-switcher select { pointer-events: auto; }
   margin-left: auto; border: none; background: none; cursor: pointer;
   color: var(--text-faint); padding: 4px 7px; border-radius: var(--radius-sm);
 }
-.tb-remove:hover { color: #C0392B; background: rgba(192, 57, 43, 0.08); }
-.tb-letters { margin-left: auto; display: flex; gap: 4px; }
-.tb-letter {
-  width: 27px; height: 27px; border-radius: var(--radius-sm); cursor: pointer;
-  border: 1px solid var(--border-strong); background: var(--surface);
-  font-size: 12.5px; font-weight: 600; color: var(--text);
+.tb-remove:hover:not(:disabled) { color: #C0392B; background: rgba(192, 57, 43, 0.08); }
+.tb-remove:disabled { opacity: 0.4; cursor: default; }
+/* the attention-grabbing "Add Here" that fills a team's empty last cell */
+.tb-addhere {
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  border: none; border-radius: var(--radius-sm); cursor: pointer; min-height: 28px;
+  background: var(--gradient-brand); color: #fff; font-size: 11.5px; font-weight: 700;
+  animation: tbPulse 1.15s ease-in-out infinite;
 }
-.tb-letter:hover:not(:disabled) { background: var(--gradient-brand); color: #fff; border-color: transparent; }
-.tb-letter:disabled { opacity: 0.3; cursor: not-allowed; }
+.tb-addhere i { font-size: 10px; }
+.tb-addhere:hover { filter: brightness(1.08); animation: none; }
+@keyframes tbPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(97, 0, 255, 0.45); }
+  50% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(97, 0, 255, 0); }
+}
 @media (max-width: 1100px) {
-  .tb-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .tb-pool { grid-template-columns: 1fr; }
+  .tb-layout { grid-template-columns: 1fr; }
+  .tb-unassigned { max-height: 340px; }
+  .tb-teams { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* per-project storage icons (sheet + drive) */

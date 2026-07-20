@@ -3240,23 +3240,9 @@
       return '<div class="tb-member">' + avatar(u, 'avatar-sm') +
         '<a href="#/profile/' + esc(u.id) + '" title="' + esc(u.name) + '">' + esc(shortName(u.name)) + '</a>' +
         (teamSlot(u) === 'mentor' ? '<i class="fa-solid fa-user-tie tb-tie" title="mentor"></i>' : '') +
-        '<button class="tb-remove" type="button" data-action="unassign-team" data-id="' + esc(u.id) + '" title="Remove from Team ' + L + '"><i class="fa-solid fa-xmark"></i></button></div>';
+        '<button class="tb-remove" type="button" data-action="unassign-team" data-id="' + esc(u.id) + '"' +
+        (teamBusy ? ' disabled' : '') + ' title="Remove from Team ' + L + '"><i class="fa-solid fa-xmark"></i></button></div>';
     }
-
-    // Slots flow into a 2-column grid: [M M] [P P] [P P] [P –] — 4 rows.
-    var cards = TEAM_LETTERS.map(function (L) {
-      var slots = '';
-      teamOf[L].mentor.forEach(function (u) { slots += memberRow(u, L); });
-      for (var i = counts[L].mentor; i < TEAM_CAP.mentor; i++) slots += '<div class="tb-member tb-empty">mentor</div>';
-      teamOf[L].participant.forEach(function (u) { slots += memberRow(u, L); });
-      for (var j = counts[L].participant; j < TEAM_CAP.participant; j++) slots += '<div class="tb-member tb-empty">participant</div>';
-      var full = counts[L].mentor >= TEAM_CAP.mentor && counts[L].participant >= TEAM_CAP.participant;
-      return '<div class="tb-card"><div class="tb-head"><h3>Team ' + L + '</h3>' +
-        '<span class="tb-counts' + (full ? ' full' : '') + '">' +
-        counts[L].mentor + '/' + TEAM_CAP.mentor + ' <i class="fa-solid fa-user-tie" title="mentors"></i> &nbsp; ' +
-        counts[L].participant + '/' + TEAM_CAP.participant + ' <i class="fa-solid fa-user" title="participants"></i></span>' +
-        '</div><div class="tb-slots">' + slots + '</div></div>';
-    }).join('');
 
     // Unassigned pool — only people with a community role; mentors first.
     var pool = users.filter(function (u) { return teamAssignable(u) && !assigned[u.id]; })
@@ -3264,33 +3250,96 @@
         var s = teamSlot(a) === teamSlot(b) ? 0 : (teamSlot(a) === 'mentor' ? -1 : 1);
         return s || (a.name || '').localeCompare(b.name || '');
       });
+    var poolIds = {};
+    pool.forEach(function (u) { poolIds[u.id] = true; });
+    // Selection only ever holds people still in the pool (assigning drops them).
+    Object.keys(teamSel).forEach(function (id) { if (!poolIds[id]) delete teamSel[id]; });
+    var selIds = Object.keys(teamSel);
+    var selCount = selIds.length;
+    // Slots the current selection needs, split by kind — an "Add Here" only
+    // shows on a team that can seat every selected person at once.
+    var need = { participant: 0, mentor: 0 };
+    selIds.forEach(function (id) { if (byId[id]) need[teamSlot(byId[id])]++; });
+
+    // Slots flow into a 2-column grid: [M M] [P P] [P P] [P –] — 4 rows. The
+    // always-empty last cell (row 4, col 2) holds the "Add Here" target.
+    var cards = TEAM_LETTERS.map(function (L) {
+      var slots = '';
+      teamOf[L].mentor.forEach(function (u) { slots += memberRow(u, L); });
+      for (var i = counts[L].mentor; i < TEAM_CAP.mentor; i++) slots += '<div class="tb-member tb-empty">mentor</div>';
+      teamOf[L].participant.forEach(function (u) { slots += memberRow(u, L); });
+      for (var j = counts[L].participant; j < TEAM_CAP.participant; j++) slots += '<div class="tb-member tb-empty">participant</div>';
+      var freeM = TEAM_CAP.mentor - counts[L].mentor;
+      var freeP = TEAM_CAP.participant - counts[L].participant;
+      var full = freeM <= 0 && freeP <= 0;
+      // The selection fits only if this team has room for its mentors AND its
+      // participants — 3 mentors never fit (cap 2); 2 mentors fit an empty team.
+      var canFit = selCount > 0 && !teamBusy && freeM >= need.mentor && freeP >= need.participant;
+      if (canFit) {
+        slots += '<button class="tb-addhere" type="button" data-action="tb-add-here" data-team="' + L + '"' +
+          ' title="Add the ' + selCount + ' selected here">' +
+          '<i class="fa-solid fa-plus"></i> Add Here</button>';
+      }
+      return '<div class="tb-card' + (full ? ' tb-full' : '') + (canFit ? ' tb-target' : '') + '">' +
+        '<div class="tb-head"><h3>Team ' + L + '</h3>' +
+        (full ? '<span class="tb-fulltag"><i class="fa-solid fa-circle-check"></i> Full</span>' : '') +
+        '</div><div class="tb-slots">' + slots + '</div></div>';
+    }).join('');
+
+    // Each pool person: a checkbox+name that toggles selection, plus a "T?"
+    // quick-assign that pops the six team buttons above the row.
     var poolRows = pool.map(function (u) {
       var st = teamSlot(u);
-      return '<div class="tb-member">' + avatar(u, 'avatar-sm') +
-        '<a href="#/profile/' + esc(u.id) + '">' + esc(u.name) + '</a>' +
-        (st === 'mentor' ? '<span class="tb-tag">mentor</span>' : '') +
-        '<span class="tb-letters">' + TEAM_LETTERS.map(function (L) {
+      var sel = !!teamSel[u.id];
+      var quick = '';
+      if (teamQuick === u.id) {
+        quick = '<div class="tb-quickbar">' + TEAM_LETTERS.map(function (L) {
           var isFull = counts[L][st] >= TEAM_CAP[st];
-          return '<button type="button" class="tb-letter" data-action="assign-team" data-id="' + esc(u.id) + '" data-team="' + L + '"' +
-            (isFull ? ' disabled title="Team ' + L + ' has no free ' + st + ' slot"' : ' title="Assign to Team ' + L + '"') + '>' + L + '</button>';
-        }).join('') + '</span></div>';
+          return '<button type="button" class="tb-qletter" data-action="assign-team" data-id="' + esc(u.id) + '" data-team="' + L + '"' +
+            ((isFull || teamBusy) ? ' disabled title="Team ' + L + ' has no free ' + st + ' slot"' : ' title="Assign to Team ' + L + '"') + '>' + L + '</button>';
+        }).join('') +
+          '<button type="button" class="tb-qclose" data-action="tb-quick-close" title="Close"><i class="fa-solid fa-xmark"></i></button></div>';
+      }
+      // "T?" is only for single/zero select — with 2+ picked, use "Add Here".
+      var tDisabled = teamBusy || selCount > 1;
+      return '<div class="tb-prow' + (sel ? ' selected' : '') + '">' + quick +
+        '<div class="tb-prow-row">' +
+          '<div class="tb-prow-main" data-action="tb-toggle-select" data-id="' + esc(u.id) + '">' +
+            '<span class="tb-check' + (sel ? ' on' : '') + '"><i class="fa-solid fa-check"></i></span>' +
+            avatar(u, 'avatar-sm') +
+            '<span class="tb-pname" title="' + esc(u.name) + '">' + esc(u.name) + '</span>' +
+            (st === 'mentor' ? '<span class="tb-tag">mentor</span>' : '') +
+          '</div>' +
+          '<button type="button" class="tb-qtoggle" data-action="tb-quick" data-id="' + esc(u.id) + '"' +
+            (tDisabled ? ' disabled' : '') + ' title="Quick assign to a team">T?</button>' +
+        '</div></div>';
     }).join('');
 
     var assignedCount = Object.keys(assigned).length;
     var assignable = users.filter(teamAssignable).length;
-    return '<div class="teamboard">' +
-      '<div class="panel"><h3><i class="fa-solid fa-user-plus"></i>Unassigned' +
-      '<span class="tb-progress">' + assignedCount + ' of ' + assignable + ' assigned</span></h3>' +
-      (pool.length ? '<div class="tb-pool">' + poolRows + '</div>'
-                   : '<p class="tb-done"><i class="fa-solid fa-circle-check"></i> Everyone is on a team.</p>') +
+    return '<div class="teamboard"><div class="tb-layout">' +
+      '<div class="tb-unassigned panel">' +
+        '<div class="tb-uhead"><h3><i class="fa-solid fa-user-plus"></i>Unassigned</h3>' +
+        (teamBusy ? '<span class="tb-spin"><i class="fa-solid fa-spinner fa-spin"></i></span>' : '') +
+        '<span class="tb-progress">' + assignedCount + ' / ' + assignable + '</span></div>' +
+        (selCount ? '<div class="tb-selbar"><span>' + selCount + ' selected</span>' +
+          '<button type="button" class="tb-clearsel" data-action="tb-clear-sel"' + (teamBusy ? ' disabled' : '') + '>Clear</button></div>' : '') +
+        (pool.length ? '<div class="tb-pool">' + poolRows + '</div>'
+                     : '<p class="tb-done"><i class="fa-solid fa-circle-check"></i> Everyone is on a team.</p>') +
       '</div>' +
-      '<div class="tb-grid">' + cards + '</div>' +
-      '</div>';
+      '<div class="tb-teams">' + cards + '</div>' +
+      '</div></div>';
   }
 
   // Which admin tab is showing; People is home. (Storage links live inside
   // each project row — no separate Resources tab.)
   var adminTab = 'people';
+
+  // Teams tab interaction state (module-level so it survives route() re-renders).
+  var teamSel = {};        // userId -> true : multi-selected people in the pool
+  var teamQuick = null;    // userId whose "T?" quick-assign popup is open
+  var teamQuickTimer = null; // auto-closes the popup after 5 s
+  var teamBusy = false;    // an assign request is in flight — freeze the board
 
   function viewAdmin() {
     var d = state.data;
@@ -3780,18 +3829,58 @@
       case 'cancel-new-project': showNewProject = false; route(); break;
       case 'switch-project-btn': switchProject(t.getAttribute('data-proj')); break;
       case 'admin-tab': adminTab = t.getAttribute('data-tab'); route(); break;
+      case 'tb-toggle-select': {
+        if (teamBusy) break;
+        if (teamSel[id]) delete teamSel[id]; else teamSel[id] = true;
+        // With 2+ picked the "Add Here" flow takes over, so drop any open popup.
+        if (Object.keys(teamSel).length > 1) { teamQuick = null; clearTimeout(teamQuickTimer); }
+        route();
+        break;
+      }
+      case 'tb-clear-sel': { teamSel = {}; route(); break; }
+      case 'tb-quick': {
+        if (teamBusy) break;
+        teamQuick = (teamQuick === id) ? null : id;
+        clearTimeout(teamQuickTimer);
+        if (teamQuick) teamQuickTimer = setTimeout(function () { teamQuick = null; route(); }, 5000);
+        route();
+        break;
+      }
+      case 'tb-quick-close': { teamQuick = null; clearTimeout(teamQuickTimer); route(); break; }
+      case 'tb-add-here': {
+        var addTeam = t.getAttribute('data-team');
+        var ids = Object.keys(teamSel);
+        if (!ids.length) break;
+        teamBusy = true; teamQuick = null; clearTimeout(teamQuickTimer); route();
+        var okCount = 0, addErr = null;
+        for (var qi = 0; qi < ids.length; qi++) {
+          try {
+            var r2 = await A.api('admin_assign_team', { userId: ids[qi], team: addTeam });
+            if (r2.teams) { state.data.teams = r2.teams; A.writeCache(state.data); }
+            delete teamSel[ids[qi]];
+            okCount++;
+          } catch (e2) { addErr = e2; }
+        }
+        teamBusy = false; route();
+        if (okCount) toast(okCount + (okCount === 1 ? ' person' : ' people') + ' → Team ' + addTeam);
+        if (addErr) toast(addErr.message, true);
+        break;
+      }
       case 'assign-team':
       case 'unassign-team': {
         var teamLetter = action === 'assign-team' ? t.getAttribute('data-team') : '';
-        t.disabled = true; // no double-fires while the request is in flight
+        // Freeze the whole board (disables every button) and show the spinner
+        // until the request settles — one assignment at a time.
+        teamBusy = true; teamQuick = null; clearTimeout(teamQuickTimer); route();
         try {
           var ar = await A.api('admin_assign_team', { userId: id, team: teamLetter });
           if (ar.teams) { state.data.teams = ar.teams; A.writeCache(state.data); }
-          route();
+          delete teamSel[id];
+          teamBusy = false; route();
           var au = userById(id);
           toast((au ? au.name : 'User') + (teamLetter ? ' → Team ' + teamLetter : ' unassigned'));
         } catch (err) {
-          t.disabled = false;
+          teamBusy = false;
           toast(err.message, true);
           refresh(); // board may be stale (someone else assigned) — resync
         }
