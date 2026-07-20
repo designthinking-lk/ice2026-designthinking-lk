@@ -1719,6 +1719,15 @@ body.landing-bg .side-oct {
    Reuses the hero + stat primitives; everything else is deliberately plain
    type on the page background, no cards unless a border earns its keep. */
 .about { max-width: 780px; margin: 0 auto; padding: 28px 0 96px; }
+/* Signed in there's no opaque .site-credit band behind the fab-stack, so the
+   bare About/Program/Tools labels would show content scrolling through them.
+   Give #/about the same opaque footer band the public view gets from
+   .site-credit — content scrolls behind it, cleared, not through it.
+   (Sits above the scrolling content but below the fab-stack at z-index 55.) */
+body:has(#navAbout.active):has(.site-credit[hidden])::after {
+  content: ""; position: fixed; left: 0; right: 0; bottom: 0;
+  height: 84px; background: var(--bg); z-index: 5; pointer-events: none;
+}
 .ab-hero h1 {
   font-size: clamp(30px, 4.6vw, 46px); letter-spacing: -0.03em;
   line-height: 1.08; margin: 10px 0 16px;
