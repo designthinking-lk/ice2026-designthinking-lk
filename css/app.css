@@ -1242,7 +1242,16 @@ body.chat-open .chat-fab { display: none; }
 
 /* connect gate */
 .chat-gate { gap: 12px; }
-.chat-gate .btn { margin-top: 4px; }
+.chat-gate .btn {
+  margin-top: 4px;
+  border-radius: 999px; overflow: hidden;      /* keep the gradient inside the pill */
+  background: linear-gradient(135deg, #00D7EE 0%, #2E6BF6 55%, #6100FF 100%);
+  /* soft, symmetric glow — no boxy directional shadow */
+  box-shadow: 0 6px 22px -8px rgba(97, 0, 255, 0.55);
+}
+.chat-gate .btn .label {
+  display: inline-flex; align-items: center; gap: 8px;  /* vertically centre the G with the text */
+}
 .chat-gate-err { color: #b3261e; font-size: 12.5px; }
 
 /* conversation view fills the pane body; only the thread scrolls */

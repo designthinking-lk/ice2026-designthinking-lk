@@ -468,7 +468,7 @@
       '<span>Message mentors and participants right here.</span>' +
       (chatConn.err ? '<span class="chat-gate-err">' + esc(chatConn.err) + '</span>' : '') +
       '<button class="btn btn-gradient btn-sm" data-action="chat-connect">' +
-      '<span class="label"><i class="fa-brands fa-google"></i> Connect messaging</span><span class="spin"></span></button></div>';
+      '<span class="label"><i class="fa-brands fa-google"></i>Connect messaging</span><span class="spin"></span></button></div>';
   }
 
   // Inbox: everyone messageable, DMs-with-history first (newest reply on top),
