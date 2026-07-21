@@ -1033,9 +1033,9 @@
       if (String(e.origin).indexOf('youtube.com') === -1) return;
       var d; try { d = JSON.parse(e.data); } catch (err) { return; }
       // YouTube flashes its center controls for ~3 s whenever playback starts;
-      // reveal once ~2 s of footage have actually played (start=12).
+      // reveal once ~1 s of footage has actually played (start=12).
       if (d && d.event === 'infoDelivery' && d.info &&
-          d.info.playerState === 1 && d.info.currentTime >= 14) {
+          d.info.playerState === 1 && d.info.currentTime >= 13) {
         window.removeEventListener('message', onMsg);
         show(0);
       }
@@ -2518,7 +2518,7 @@
       '<div class="stat"><b>6</b><span>universities</span></div>' +
       '<div class="stat"><b>14</b><span>facilitators</span></div>' +
       '<div class="stat"><b>40</b><span>hours in 3 days</span></div>' +
-      '<span class="ab-stats-note">Design Innovation 2025</span>' +
+      '<span class="ab-stats-note">ICE2025</span>' +
       '</div>' +
 
       '<section class="ab-section">' +
