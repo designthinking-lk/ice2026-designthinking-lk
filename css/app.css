@@ -1982,23 +1982,27 @@ html.is-mobile.is-wallet .btn-wallet { width: 100%; box-sizing: border-box; }
 
 /* Add-to-Wallet flyout — occupies the persona space on #/me while shown */
 .wallet-flyout {
-  flex: 1; position: relative; display: flex; align-items: center; justify-content: center;
-  gap: 18px; flex-wrap: wrap; padding: 8px 8px 4px; box-sizing: border-box;
+  flex: 1; position: relative; display: flex; align-items: stretch; justify-content: center;
+  padding: 0; box-sizing: border-box;
   animation: wallet-flyout-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 /* QR + wallet buttons as one outlined block, everything centred on the same axis */
 .wallet-block {
-  position: relative;
-  display: flex; flex-direction: column; align-items: center; gap: 16px;
+  position: relative; box-sizing: border-box;
+  width: 300px; max-width: 100%; height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
   padding: 18px; border: 1px solid var(--border); border-radius: var(--radius-lg);
   background: var(--surface);
 }
-.wallet-block-qr { line-height: 0; }
+/* the QR spans the block width so it lines up exactly with the button row */
+.wallet-block-qr { width: 100%; line-height: 0; }
+.wallet-block .wallet-qr { flex: none; width: 100%; padding: 8px; box-sizing: border-box; }
+.wallet-block .wallet-qr img { width: 100%; height: auto; }
 .wallet-block-passes { display: flex; gap: 12px; width: 100%; min-height: 44px; }
 .wallet-block-passes .btn-wallet, .wallet-block-passes .wallet-skel-btn { flex: 1 1 0; height: 44px; min-width: 0; padding-top: 0; padding-bottom: 0; }
 /* skeletons: same footprint as the QR / buttons they replace, so nothing jumps */
 .wallet-skel { background: linear-gradient(100deg, var(--bg-subtle) 40%, #fff 50%, var(--bg-subtle) 60%); background-size: 200% 100%; animation: shim 1.2s infinite; }
-.wallet-skel-qr { width: 210px; height: 210px; border-radius: var(--radius-md); }
+.wallet-skel-qr { width: 100%; aspect-ratio: 1 / 1; border-radius: var(--radius-md); }
 .wallet-skel-btn { border-radius: 999px; }
 .wallet-flyout[hidden] { display: none; }
 @keyframes wallet-flyout-in {

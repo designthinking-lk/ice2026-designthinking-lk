@@ -1318,7 +1318,7 @@
       qr.make();
       el.innerHTML = qr.createImgTag(5, 2);
       var img = el.querySelector('img');
-      if (img) { img.style.width = '190px'; img.style.height = '190px'; img.style.imageRendering = 'pixelated'; img.alt = 'Scan to add to wallet'; }
+      if (img) { img.style.width = '100%'; img.style.height = 'auto'; img.style.imageRendering = 'pixelated'; img.alt = 'Scan to add to wallet'; }
     } catch (e) {
       el.textContent = 'Could not render QR.';
     }
@@ -1368,10 +1368,11 @@
     if (persona) persona.hidden = false;
     restoreWalletButtons();
   }
-  /** Restore the Save/Add-to-wallet row and unfreeze the id card. */
+  /** Restore the Save row + status and unfreeze the id card. */
   function restoreWalletButtons() {
-    var btns = $('#faButtons'), left = $('.pf-left');
-    if (btns) btns.hidden = false;
+    var join = $('#joinWrap'), status = $('#profileStatus'), left = $('.pf-left');
+    if (join) join.hidden = false;
+    if (status) status.hidden = false;
     if (left) left.classList.remove('pf-frozen');
   }
   // Reset the inactivity timer on any interaction inside the wallet block.
@@ -1404,9 +1405,11 @@
     if (persona) persona.hidden = true;
     fly.hidden = false;
     wireWalletActivity(fly);
-    // hide the Save row + freeze the card while the wallet block is up
-    var btns = $('#faButtons'), left = $('.pf-left');
-    if (btns) btns.hidden = true;
+    // hide the Save row + status and freeze the card so the wallet block can
+    // stretch to the full column height (= the id card's height)
+    var join = $('#joinWrap'), status = $('#profileStatus'), left = $('.pf-left');
+    if (join) join.hidden = true;
+    if (status) status.hidden = true;
     if (left) left.classList.add('pf-frozen');
     // mint the QR + wallet links once, then reuse
     if (!fly.getAttribute('data-loaded')) {
