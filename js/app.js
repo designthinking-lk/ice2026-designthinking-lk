@@ -3444,11 +3444,17 @@
     // Slots stack one-per-row now, so the full name fits (a mentor keeps the
     // compact tie icon rather than a wider pill).
     function memberRow(u, L) {
-      return '<div class="tb-member">' + avatar(u, 'avatar-sm') +
+      // While this person's own remove is in flight, freeze just their row:
+      // swap the × for a spinner so it's clear who is being moved.
+      var busy = teamBusyId === u.id;
+      var removeCtl = busy
+        ? '<span class="tb-remove tb-remove-busy" title="Removing…"><i class="fa-solid fa-spinner fa-spin"></i></span>'
+        : '<button class="tb-remove" type="button" data-action="unassign-team" data-id="' + esc(u.id) + '"' +
+          (teamBusy ? ' disabled' : '') + ' title="Remove from Team ' + L + '"><i class="fa-solid fa-xmark"></i></button>';
+      return '<div class="tb-member' + (busy ? ' tb-member-busy' : '') + '">' + avatar(u, 'avatar-sm') +
         '<a href="#/profile/' + esc(u.id) + '" title="' + esc(u.name) + '">' + esc(u.name) + '</a>' +
         (teamSlot(u) === 'mentor' ? '<i class="fa-solid fa-user-tie tb-tie" title="mentor"></i>' : '') +
-        '<button class="tb-remove" type="button" data-action="unassign-team" data-id="' + esc(u.id) + '"' +
-        (teamBusy ? ' disabled' : '') + ' title="Remove from Team ' + L + '"><i class="fa-solid fa-xmark"></i></button></div>';
+        removeCtl + '</div>';
     }
 
     // Unassigned pool — only people with a community role; mentors first.
@@ -3517,7 +3523,10 @@
         '><i class="fa-solid fa-check"></i></span>';
       var head = check + avatar(u, 'avatar-sm');
       var tail;
-      if (quick) {
+      if (teamBusyId === u.id) {
+        // this person's assignment is in flight — freeze their row with a spinner
+        tail = '<span class="tb-pname tb-prow-busy" title="Assigning…"><i class="fa-solid fa-spinner fa-spin"></i> Assigning…</span>';
+      } else if (quick) {
         tail = '<div class="tb-quickrow">' + TEAM_LETTERS.map(function (L) {
           var isFull = counts[L][st] >= TEAM_CAP[st];
           return '<button type="button" class="tb-qletter" data-action="assign-team" data-id="' + esc(u.id) + '" data-team="' + L + '"' +
@@ -3611,6 +3620,7 @@
   var teamQuick = null;    // userId whose "T?" quick-assign popup is open
   var teamQuickTimer = null; // auto-closes the popup after 5 s
   var teamBusy = false;    // an assign request is in flight — freeze the board
+  var teamBusyId = null;   // the single person being (re)assigned — shows a spinner on their card
 
   function viewAdmin() {
     var d = state.data;
@@ -4193,16 +4203,16 @@
         var teamLetter = action === 'assign-team' ? t.getAttribute('data-team') : '';
         // Freeze the whole board (disables every button) and show the spinner
         // until the request settles — one assignment at a time.
-        teamBusy = true; teamQuick = null; clearTimeout(teamQuickTimer); route();
+        teamBusy = true; teamBusyId = id; teamQuick = null; clearTimeout(teamQuickTimer); route();
         try {
           var ar = await A.api('admin_assign_team', { userId: id, team: teamLetter });
           if (ar.teams) { state.data.teams = ar.teams; A.writeCache(state.data); }
           delete teamSel[id];
-          teamBusy = false; route();
+          teamBusy = false; teamBusyId = null; route();
           var au = userById(id);
           toast((au ? au.name : 'User') + (teamLetter ? ' → Team ' + teamLetter : ' unassigned'));
         } catch (err) {
-          teamBusy = false;
+          teamBusy = false; teamBusyId = null;
           toast(err.message, true);
           refresh(); // board may be stale (someone else assigned) — resync
         }
