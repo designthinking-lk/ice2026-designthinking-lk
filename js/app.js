@@ -1463,9 +1463,21 @@
       rs.forEach(function (x) { if (x.google) g = x.google; if (x.apple) a = x.apple; });
       var btnG = g ? '<a class="btn-wallet btn-wallet-google btn-wallet-lg" href="' + esc(g) + '"><i class="fa-brands fa-google-wallet"></i><span>Add to Google Wallet</span></a>' : '';
       var btnA = a ? '<a class="btn-wallet btn-wallet-apple btn-wallet-lg" href="' + esc(a) + '"><i class="fa-brands fa-apple"></i><span>Add to Apple Wallet</span></a>' : '';
-      // On Apple devices lead with the Apple button.
-      var html = isApplePlatform_() ? (btnA + btnG) : (btnG + btnA);
+      var apple = isApplePlatform_();
+      // On Apple devices lead with the Apple button. Keep both as a fallback.
+      var html = apple ? (btnA + btnG) : (btnG + btnA);
       action.innerHTML = html || '<p class="wallet-err">Could not prepare your card. Reopen the QR from your profile.</p>';
+      // Phone: jump straight to the matching wallet (iOS → Apple, else Google).
+      // One-shot per token so the back button returns to the buttons instead of
+      // bouncing straight out again.
+      var primary = apple ? (a || g) : (g || a);
+      var phone = /Mobi|Android/i.test(navigator.userAgent) || apple;
+      var jumped = false;
+      try { jumped = sessionStorage.getItem('ice.wallet.jumped') === (wt || 'self'); } catch (e) {}
+      if (primary && phone && !jumped) {
+        try { sessionStorage.setItem('ice.wallet.jumped', wt || 'self'); } catch (e) {}
+        location.href = primary;
+      }
     });
   }
 
@@ -3705,6 +3717,9 @@
 
   function route() {
     var hash = location.hash || '#/';
+    // #/wallet is phone-first — keep the .is-wallet flag in sync so its CSS
+    // bypasses the mobile gate and shows only the handoff view.
+    document.documentElement.classList.toggle('is-wallet', /^#\/wallet/.test(hash));
     closeMenu();
     // Drop an open announcement draft when leaving the news page.
     if (annDraft.open && !/^#\/announcements$/.test(hash)) annDraft = { open: false, editing: null };

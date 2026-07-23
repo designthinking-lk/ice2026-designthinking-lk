@@ -1935,6 +1935,20 @@ html.is-mobile .site-credit { display: none; }
 .mobile-gate p { margin: 0; max-width: 30em; color: var(--text-body); font-size: 14.5px; line-height: 1.55; }
 .mobile-gate .mg-brand { margin-top: 26px; color: var(--text-muted); font-family: var(--font-display); font-size: 12.5px; letter-spacing: 0.02em; }
 
+/* #/wallet is phone-first (landed on from a scanned QR): bypass the gate and
+   show ONLY the wallet handoff — no sidebar, topbar, fabs or frosted band. */
+html.is-mobile.is-wallet { overflow: auto; }
+html.is-mobile.is-wallet .mobile-gate { display: none; }
+html.is-mobile.is-wallet .shell { display: flex; }
+html.is-mobile.is-wallet .sidebar,
+html.is-mobile.is-wallet .topbar,
+html.is-mobile.is-wallet .fab-stack,
+html.is-mobile.is-wallet .site-credit,
+html.is-mobile.is-wallet .shell::before { display: none; }
+html.is-mobile.is-wallet .view { padding: 20px 16px; }
+html.is-mobile.is-wallet .wallet-view { margin-top: 5vh; max-width: 100%; }
+html.is-mobile.is-wallet .btn-wallet { width: 100%; box-sizing: border-box; }
+
 /* ---------------------------------------------------------------- wallet */
 .wallet-panel { margin-top: 22px; }
 .wallet-panel .wallet-lead { margin: 0 0 14px; color: var(--text-muted); font-size: 13.5px; line-height: 1.5; }
