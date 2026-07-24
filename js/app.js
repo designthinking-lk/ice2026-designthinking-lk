@@ -2726,12 +2726,17 @@
   // Team member circles shown below the stacked card (left column).
   function projMembersStripHtml(slot) {
     var members = projectMembers(slot);
-    var chips = members.length
-      ? members.map(function (m) {
-          return '<a class="pms-avatar" href="#/profile/' + esc(m.id) + '" data-action="proj-nav" title="' + esc(m.name) + '">' + avatar(m, 'avatar-sm') + '</a>';
-        }).join('')
-      : '<span class="pms-empty">No members assigned to ' + esc(teamLabel(slot)) + ' yet.</span>';
-    return '<div class="pms-head">Team</div><div class="pms-chips">' + chips + '</div>';
+    var parts = members.filter(function (u) { return teamSlot(u) === 'participant'; });
+    var ments = members.filter(function (u) { return teamSlot(u) === 'mentor'; });
+    function circle(u, kind) {
+      if (u) return '<a class="pms-avatar" href="#/profile/' + esc(u.id) + '" data-action="proj-nav" title="' + esc(u.name) + '">' + avatar(u, 'avatar-sm') + '</a>';
+      return '<span class="pms-slot pms-' + kind + '" title="' + (kind === 'mentor' ? 'Mentor' : 'Member') + ' slot — open">' + (kind === 'mentor' ? '<i class="fa-solid fa-user-tie"></i>' : '') + '</span>';
+    }
+    var chips = '';
+    for (var i = 0; i < TEAM_CAP.participant; i++) chips += circle(parts[i], 'participant');
+    chips += '<span class="pms-sep"></span>';
+    for (var j = 0; j < TEAM_CAP.mentor; j++) chips += circle(ments[j], 'mentor');
+    return '<div class="pms-head">' + esc(teamLabel(slot)) + '</div><div class="pms-chips">' + chips + '</div>';
   }
   function renderMembersStrip() {
     var s = $('#projMembersStrip');
@@ -2814,7 +2819,8 @@
     // or below it (single column)
     var fT = cards[0].offsetTop;
     var multiCol = cards.length > 1 && cards[1].offsetTop === fT;
-    if (multiCol) { detail.style.left = cards[1].offsetLeft + 'px'; detail.style.top = '0'; }
+    // extra breathing space between the card stack (+ its fan) and the detail
+    if (multiCol) { detail.style.left = (cards[1].offsetLeft + 40) + 'px'; detail.style.top = '0'; }
     else { detail.style.left = '0'; detail.style.top = (fT + cards[0].offsetHeight + 26) + 'px'; }
     detail.hidden = false;
     detail.innerHTML = projectDetailHtml(slot);
@@ -2823,7 +2829,6 @@
     if (strip && multiCol) {
       strip.style.left = cards[0].offsetLeft + 'px';
       strip.style.top = (fT + cards[0].offsetHeight + 46) + 'px';
-      strip.style.width = cards[0].offsetWidth + 'px';
       strip.hidden = false;
       strip.innerHTML = projMembersStripHtml(slot);
     }

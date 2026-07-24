@@ -1519,12 +1519,18 @@ body.hive-full .project-switcher select { pointer-events: auto; }
   animation: proj-detail-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .proj-members-strip[hidden] { display: none; }
-.pms-head { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
-.pms-chips { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
-.pms-avatar { display: block; border-radius: 50%; transition: transform 0.12s; }
-.pms-avatar .avatar { width: 42px; height: 42px; border: 2px solid var(--surface); box-shadow: 0 3px 10px -3px rgba(0, 0, 0, 0.45); }
-.pms-avatar:hover { transform: translateY(-3px); }
-.pms-empty { color: var(--text-muted); font-size: 13px; }
+.pms-head { font-size: 13px; font-weight: 700; letter-spacing: 0.01em; color: var(--text); }
+.pms-chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pms-avatar { display: block; border-radius: 50%; }
+.pms-avatar .avatar { width: 38px; height: 38px; border: 2px solid var(--surface); box-shadow: 0 3px 10px -3px rgba(0, 0, 0, 0.45); }
+/* empty (unfilled) team slots — dashed placeholder circles */
+.pms-slot {
+  width: 38px; height: 38px; border-radius: 50%; box-sizing: border-box;
+  border: 2px dashed var(--border-strong); background: transparent;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-faint); font-size: 13px;
+}
+.pms-sep { width: 8px; flex: none; } /* gap between the participant and mentor slots */
 @keyframes proj-detail-in { from { opacity: 0; transform: translateX(26px); } to { opacity: 1; transform: none; } }
 .proj-detail.closing { animation: proj-detail-out 0.2s ease forwards; }
 @keyframes proj-detail-out { to { opacity: 0; transform: translateX(16px); } }
