@@ -2678,6 +2678,8 @@
   var projEdit = false;    // inline edit mode within the open panel
   var projEditColor = '';  // pending colour while editing
   var projStack = [];      // slots front→back while a project is open (for flipping)
+  var projEditTab = 'details';         // active edit tab: 'details' | 'video'
+  var projEditDraft = { title: '', description: '' }; // unsaved edits (survive tab switches)
 
   function teamProjectsData() {
     var tp = state.data && state.data.teamProjects;
@@ -2779,25 +2781,39 @@
     var inner, footer;
     if (editing) {
       var color = projEditColor || projColorClass(p, slot);
-      inner =
-        '<label class="proj-lbl">Project title <span class="proj-lbl-hint">— one line</span></label>' +
-        '<input class="proj-title-in" id="projTitleIn" maxlength="60" value="' + esc(p.title) + '" placeholder="Project title">' +
-        '<label class="proj-lbl">Description <span class="proj-lbl-hint">— up to two lines</span></label>' +
-        '<textarea class="proj-desc-in" id="projDescIn" maxlength="160" rows="3" placeholder="One-line description">' + esc(p.description) + '</textarea>' +
-        '<label class="proj-lbl">Card colour</label>' +
+      var tab = projEditTab || 'details';
+      var tabs =
+        '<div class="proj-tabs">' +
+        '<button type="button" class="proj-tab' + (tab === 'details' ? ' on' : '') + '" data-action="proj-edit-tab" data-tab="details">Details</button>' +
+        '<button type="button" class="proj-tab' + (tab === 'video' ? ' on' : '') + '" data-action="proj-edit-tab" data-tab="video"><i class="fa-solid fa-video"></i>Video</button>' +
+        '</div>';
+      var tabBody;
+      if (tab === 'video') {
+        tabBody =
+          '<p class="proj-vid-lead">Your team’s pitch clip — up to 30 seconds. It loops as the card background.</p>' +
+          '<div class="proj-vid-row">' +
+            '<button class="btn btn-outline" type="button" data-action="proj-upload-video" data-slot="' + slot + '"><i class="fa-solid fa-upload"></i>' + (p.video ? 'Replace video' : 'Upload video') + '</button>' +
+            (p.video ? '<button class="btn btn-ghost proj-vid-remove" type="button" data-action="proj-remove-video" data-slot="' + slot + '"><i class="fa-regular fa-trash-can"></i>Remove</button>' : '') +
+          '</div>' +
+          (p.video ? '<div class="proj-vid-ok"><i class="fa-solid fa-circle-check"></i>Video added — it loops on the card.</div>' : '') +
+          '<div class="proj-vid-status" id="projVideoStatus"></div>';
+      } else {
+        tabBody =
+          '<label class="proj-lbl">Project title <span class="proj-lbl-hint">— one line</span></label>' +
+          '<input class="proj-title-in" id="projTitleIn" maxlength="40" value="' + esc(projEditDraft.title) + '" placeholder="Project title">' +
+          '<label class="proj-lbl">Description <span class="proj-lbl-hint">— up to two lines</span></label>' +
+          '<textarea class="proj-desc-in" id="projDescIn" maxlength="105" rows="3" placeholder="One-line description">' + esc(projEditDraft.description) + '</textarea>';
+      }
+      inner = tabs + '<div class="proj-tab-body">' + tabBody + '</div>';
+      footer =
         '<div class="proj-colors">' + [1, 2, 3, 4, 5, 6].map(function (n) {
           var c = 'pc-' + n;
           return '<button type="button" class="proj-swatch ' + c + (c === color ? ' on' : '') + '" data-action="proj-color" data-color="' + c + '" data-slot="' + slot + '" aria-label="Colour ' + n + '"></button>';
         }).join('') + '</div>' +
-        '<label class="proj-lbl">Pitch video <span class="proj-lbl-hint">— your team’s clip, 30s max</span></label>' +
-        '<div class="proj-vid-row">' +
-          '<button class="btn btn-outline" type="button" data-action="proj-upload-video" data-slot="' + slot + '"><i class="fa-solid fa-video"></i>' + (p.video ? 'Replace video' : 'Upload video') + '</button>' +
-          (p.video ? '<span class="proj-vid-ok"><i class="fa-solid fa-circle-check"></i>Video added</span>' : '') +
-        '</div>' +
-        '<div class="proj-vid-status" id="projVideoStatus"></div>';
-      footer =
-        '<button class="btn btn-ghost" type="button" data-action="proj-cancel">Cancel</button>' +
-        '<button class="btn btn-gradient" type="button" data-action="proj-save" data-slot="' + slot + '"><span class="label">Save changes</span><span class="spin"></span></button>';
+        '<div class="proj-foot-actions">' +
+          '<button class="btn btn-ghost" type="button" data-action="proj-cancel">Cancel</button>' +
+          '<button class="btn btn-gradient" type="button" data-action="proj-save" data-slot="' + slot + '"><span class="label">Save changes</span><span class="spin"></span></button>' +
+        '</div>';
     } else {
       inner =
         '<h2 class="proj-d-title">' + esc(p.title) + '</h2>' +
@@ -2849,7 +2865,8 @@
     if (!grid || !detail || projSel != null) return;
     var cards = Array.prototype.slice.call(grid.querySelectorAll('.project-card'));
     if (!cards.length) return;
-    projSel = slot; projEdit = !!edit; projEditColor = '';
+    projSel = slot;
+    if (edit) startProjectEdit(slot); else { projEdit = false; projEditColor = ''; }
     projStack = [slot].concat(teamProjectsData().map(function (p) { return p.slot; }).filter(function (s) { return s !== slot; }));
     grid.classList.add('pp-open'); // enable the transition BEFORE moving cards
     applyStack(projStack);
@@ -2918,14 +2935,20 @@
       if (projEdit) { var ti = $('#projTitleIn'); if (ti) ti.focus(); wireProjectEditPreview(); }
     }
   }
-  // Live-preview title/description onto the stacked front card as the user types.
+  // Live-preview title/description onto the stacked front card as the user types,
+  // and keep the draft in sync so edits survive tab switches.
   function wireProjectEditPreview() {
     var card = $('#projectsGrid .pc-front');
-    if (!card) return;
-    var h3 = card.querySelector('.pc-text h3'), pp = card.querySelector('.pc-text p');
+    var h3 = card && card.querySelector('.pc-text h3');
+    var pp = card && card.querySelector('.pc-text p');
     var ti = $('#projTitleIn'), de = $('#projDescIn');
-    if (ti && h3) ti.oninput = function () { h3.textContent = ti.value || 'Untitled project'; };
-    if (de && pp) de.oninput = function () { pp.textContent = de.value; };
+    if (ti) ti.oninput = function () { projEditDraft.title = ti.value; if (h3) h3.textContent = ti.value || 'Untitled project'; };
+    if (de) de.oninput = function () { projEditDraft.description = de.value; if (pp) pp.textContent = de.value; };
+  }
+  function startProjectEdit(slot) {
+    var p = projectBySlot(slot) || { title: '', description: '' };
+    projEdit = true; projEditColor = ''; projEditTab = 'details';
+    projEditDraft = { title: p.title, description: p.description };
   }
   function closeProject() {
     var grid = $('#projectsGrid'), detail = $('#projDetail');
@@ -2948,13 +2971,15 @@
     }, 760);
   }
   function saveProject(slot, btn) {
-    var titleEl = $('#projTitleIn'), descEl = $('#projDescIn');
-    var title = titleEl ? titleEl.value : undefined;
-    if (title !== undefined && !title.trim()) { toast('Title cannot be empty.', true); return; }
+    // draft is kept live by wireProjectEditPreview, so it holds the latest values
+    // even if the Details tab isn't currently mounted.
+    var ti = $('#projTitleIn'); if (ti) projEditDraft.title = ti.value;
+    var de = $('#projDescIn'); if (de) projEditDraft.description = de.value;
+    if (!(projEditDraft.title || '').trim()) { projEditTab = 'details'; renderProjectDetail(); toast('Title cannot be empty.', true); return; }
     busy(btn, true);
     A.api('team_project_update', {
-      slot: slot, title: title,
-      description: descEl ? descEl.value : undefined,
+      slot: slot, title: projEditDraft.title,
+      description: projEditDraft.description,
       color: projEditColor || undefined,
     }).then(function (r) {
       if (r && r.teamProjects) { state.data.teamProjects = r.teamProjects; A.writeCache(state.data); }
@@ -4231,7 +4256,24 @@
         break;
       }
       case 'proj-edit': e.preventDefault(); e.stopPropagation(); openProject(Number(t.getAttribute('data-slot')), true); break;
-      case 'proj-edit-inline': projEdit = true; projEditColor = ''; renderProjectDetail(); break;
+      case 'proj-edit-inline': startProjectEdit(projSel); renderProjectDetail(); break;
+      case 'proj-edit-tab': {
+        // capture any in-flight text edits before swapping tabs (draft persists)
+        var teI = $('#projTitleIn'); if (teI) projEditDraft.title = teI.value;
+        var deI = $('#projDescIn'); if (deI) projEditDraft.description = deI.value;
+        projEditTab = t.getAttribute('data-tab') || 'details';
+        renderProjectDetail();
+        break;
+      }
+      case 'proj-remove-video': {
+        var rvSlot = Number(t.getAttribute('data-slot'));
+        A.api('team_project_update', { slot: rvSlot, video: '' }).then(function (r) {
+          if (r && r.teamProjects) { state.data.teamProjects = r.teamProjects; A.writeCache(state.data); }
+          renderProjectDetail();
+          toast('Video removed');
+        }).catch(function (err) { toast(err.message, true); });
+        break;
+      }
       case 'proj-color': {
         projEditColor = t.getAttribute('data-color');
         var fc = $('#projectsGrid .pc-front'); // live-preview on the stacked hero card
