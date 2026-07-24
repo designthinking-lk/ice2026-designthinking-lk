@@ -1584,6 +1584,9 @@ body.hive-full .project-switcher select { pointer-events: auto; }
 .proj-vid-lead { margin: 0 0 16px; font-size: 13.5px; line-height: 1.55; color: var(--text-muted); }
 .proj-vid-remove { color: #b3261e; }
 .proj-vid-remove:hover { background: rgba(179, 38, 30, 0.08); }
+/* frozen while a save is in flight — no further input on the card */
+.proj-detail.proj-busy { pointer-events: none; }
+.proj-detail.proj-busy .proj-tabs, .proj-detail.proj-busy .proj-tab-body, .proj-detail.proj-busy .proj-colors { opacity: 0.5; transition: opacity 0.15s ease; }
 .proj-d-title { margin: 0 0 8px; font-family: var(--font-display); font-size: 26px; letter-spacing: -0.02em; }
 .proj-d-desc { margin: 0 0 24px; font-size: 15px; line-height: 1.6; color: var(--text-body); }
 .proj-lbl { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; color: var(--text-muted); margin: 0 0 6px; }

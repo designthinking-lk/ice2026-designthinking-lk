@@ -2976,6 +2976,8 @@
     var ti = $('#projTitleIn'); if (ti) projEditDraft.title = ti.value;
     var de = $('#projDescIn'); if (de) projEditDraft.description = de.value;
     if (!(projEditDraft.title || '').trim()) { projEditTab = 'details'; renderProjectDetail(); toast('Title cannot be empty.', true); return; }
+    var detail = $('#projDetail');
+    if (detail) detail.classList.add('proj-busy'); // freeze the whole card during the save
     busy(btn, true);
     A.api('team_project_update', {
       slot: slot, title: projEditDraft.title,
@@ -2985,6 +2987,7 @@
       if (r && r.teamProjects) { state.data.teamProjects = r.teamProjects; A.writeCache(state.data); }
       projEdit = false; projEditColor = '';
       renderProjectDetail();
+      var d2 = $('#projDetail'); if (d2) d2.classList.remove('proj-busy');
       // update the stacked front card's face in place (keep its transform)
       var np = projectBySlot(slot);
       var card = $('#projectsGrid .project-card[data-slot="' + slot + '"]');
@@ -2995,7 +2998,10 @@
         if (pp) pp.textContent = np.description;
       }
       toast('Project saved');
-    }).catch(function (err) { toast(err.message, true); busy(btn, false); });
+    }).catch(function (err) {
+      toast(err.message, true); busy(btn, false);
+      var d3 = $('#projDetail'); if (d3) d3.classList.remove('proj-busy');
+    });
   }
 
   // Pick + validate (format, ≤30s, ≤25MB) + upload a team pitch video to Drive.
