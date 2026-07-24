@@ -133,7 +133,11 @@
   // Low-level authed fetch. On 401 (token expired mid-session) it clears the
   // token so the next call re-prompts. Throws Error(message) on API errors.
   async function call(method, path, body) {
-    var token = await getAccessToken();
+    // Silent only: a background poll (unread/convo) that finds the token expired
+    // must never pop up the Google chooser. The popup is reserved for the
+    // explicit `connect()` user gesture; if silent renewal needs UI this throws
+    // and the caller falls back to the Connect gate.
+    var token = await getAccessToken({ silent: true });
     var res = await fetch(/^https?:/.test(path) ? path : API + path, {
       method: method,
       headers: {
@@ -159,7 +163,7 @@
    *  users/{id} value (OpenID sub); email is the account the token is for. */
   async function me() {
     if (meCache && meCache.id) return meCache;
-    var token = await getAccessToken();
+    var token = await getAccessToken({ silent: true });
     meCache = await fetchUserInfo(token);
     persistToken();
     return meCache;

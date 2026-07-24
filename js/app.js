@@ -240,14 +240,32 @@
 
   // --------------------------------------------------------------- data
 
-  async function refresh() {
+  // A background refresh must never blow away live, ephemeral DOM state the
+  // user is mid-interaction with — a full route() would un-flip the project
+  // stack, restart a playing intro video, or wipe an unsaved photo preview.
+  function viewBusy() {
+    if ($('#profileForm')) return true;      // profile editor (card flip, photo preview, video)
+    if (projSel != null) return true;         // a project card is open / being flipped
+    var view = $('#view');
+    if (view && view.querySelector('video, iframe[src*="youtu"]')) return true; // an intro video is on screen
+    return false;
+  }
+
+  // opts.background = true: data-only refresh (chrome updates, but the view is
+  // only re-rendered when it's safe — never mid-interaction). User-triggered
+  // refreshes (after a save, etc.) pass nothing and always re-render.
+  async function refresh(opts) {
+    opts = opts || {};
     try {
+      var hadData = !!state.data;
       var data = await A.api('bootstrap');
       state.data = data;
       state.loaded = true;
       A.writeCache(data);
       renderChrome();
-      route(); // re-render current view with fresh data
+      // Always re-render on first paint (no prior data); otherwise a background
+      // refresh defers to the view when it's busy.
+      if (!opts.background || !hadData || !viewBusy()) route();
     } catch (err) {
       // A stale/deleted project selection must not brick the app — fall back
       // to the default project once.
@@ -4732,19 +4750,18 @@
     state.data = A.readCache();
     renderChrome();
     route();
-    refresh().then(function () {
+    refresh({ background: true }).then(function () {
       if (justSignedIn && signedIn() && state.data && !state.data.me) {
         location.hash = '#/register';
       }
     });
     // Keep presence dots + broadcasts fresh (and mark ourselves online)
     // while the tab is visible. 2 min < the backend's 5-min online window.
+    // Background mode: refreshes data + chrome but never re-renders a busy view
+    // (open project stack, playing video, unsaved edit).
     setInterval(function () {
       if (document.visibilityState !== 'visible' || !signedIn()) return;
-      // Never rebuild the view while a card is being edited — route() would
-      // wipe the not-yet-saved photo preview and un-flip the card.
-      if ($('#profileForm')) return;
-      refresh();
+      refresh({ background: true });
     }, 120000);
   })();
 })();
